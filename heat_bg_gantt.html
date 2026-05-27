@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEAT BG Team — Gantt Chart 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#0f1117; --surface:#181b24; --surface2:#1e2230; --border:#2a2f3e;
+  --text:#e2e6f0; --muted:#7a8099; --accent:#4f8ef7;
+  --s-done:#22c55e; --s-final:#16a34a; --s-wip:#f59e0b;
+  --s-backlog:#64748b; --s-review:#a855f7;
+  --t-epic:#a78bfa; --t-task:#93c5fd; --t-sub:#67e8f9; --t-new:#fdba74;
+  --row-h:28px; --label-w:500px; --header-h:64px;
+  --title-w:240px; --assignee-w:72px; --prog-w:110px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:12px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── 헤더 ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;flex-shrink:0}
+header h1{font-size:15px;font-weight:700;color:#fff}
+header small{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select,input[type=text]{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:5px;font-size:11px;font-family:inherit;outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--muted)}
+.btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{background:var(--border)}
+.btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ── 범례 ── */
+.legend{background:var(--surface);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;gap:16px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.leg-dot{width:10px;height:10px;border-radius:2px}
+
+/* ── 간트 본체 ── */
+.gantt-wrap{display:flex;flex:1;overflow:hidden;position:relative}
+
+/* 왼쪽 라벨 패널 */
+.label-panel{width:var(--label-w);flex-shrink:0;display:flex;flex-direction:column;border-right:2px solid var(--border);background:var(--surface);z-index:20}
+.label-header{height:var(--header-h);border-bottom:2px solid var(--border);display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.label-body{overflow-y:auto;overflow-x:hidden;flex:1}
+.label-body::-webkit-scrollbar{width:0}
+
+.label-row{height:var(--row-h);display:flex;align-items:center;padding:0 8px;border-bottom:1px solid var(--border);cursor:pointer;transition:.12s;gap:4px;min-width:0}
+.label-row:hover{background:var(--surface2)}
+.label-row.epic-row{background:rgba(124,58,237,.08)}
+.label-row.epic-row .row-title{font-weight:600;color:var(--t-epic)}
+.label-row.sub-row .row-title{color:var(--t-sub)}
+.row-indent{flex-shrink:0}
+.row-toggle{font-size:9px;color:var(--muted);flex-shrink:0;width:12px;text-align:center;transition:.2s}
+.row-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:var(--title-w);flex-shrink:0;font-size:11px}
+.type-pip{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+/* 담당자 셀 */
+.row-assignee{width:var(--assignee-w);flex-shrink:0;display:flex;align-items:center;gap:4px;overflow:hidden;border-left:1px solid var(--border);padding-left:6px}
+.row-assignee .av{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0}
+.row-assignee .av-name{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 진행률 셀 */
+.row-prog{width:var(--prog-w);flex-shrink:0;display:flex;align-items:center;gap:5px;border-left:1px solid var(--border);padding-left:6px}
+.row-prog .pn{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);width:28px;flex-shrink:0;text-align:right}
+.row-prog .pb{flex:1;min-width:0;height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;position:relative}
+.row-prog .pb-fill{position:absolute;top:0;left:0;height:6px;border-radius:3px;background:linear-gradient(90deg,#3b82f6,#60a5fa);transition:width .3s ease}
+/* 라벨 헤더 컬럼 */
+.label-header{height:var(--header-h);border-bottom:2px solid var(--border);display:flex;align-items:center;padding:0 0 0 8px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;gap:4px}
+.lh-title{width:var(--title-w);padding-left:29px}
+.lh-assignee{width:var(--assignee-w);flex-shrink:0;border-left:1px solid var(--border);padding-left:6px}
+.lh-prog{width:var(--prog-w);flex-shrink:0;border-left:1px solid var(--border);padding-left:6px}
+
+/* 오른쪽 차트 패널 */
+.chart-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chart-header{height:var(--header-h);border-bottom:2px solid var(--border);position:relative;overflow-x:scroll;overflow-y:hidden;flex-shrink:0;background:var(--surface);scrollbar-width:none}
+.chart-header::-webkit-scrollbar{display:none}
+.chart-body{flex:1;overflow:auto;position:relative}
+.chart-body::-webkit-scrollbar{height:8px;width:8px}
+.chart-body::-webkit-scrollbar-track{background:var(--surface)}
+.chart-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* 시간축 */
+.time-axis{position:absolute;top:0;left:0;height:100%;pointer-events:none}
+.time-col-q{position:absolute;top:0;height:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--muted);border-right:1px solid var(--border);letter-spacing:.3px;text-transform:uppercase}
+.time-col-m{position:absolute;top:22px;height:34px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);border-right:1px solid rgba(255,255,255,.06)}
+.time-col-m.today-m{color:var(--accent);font-weight:700}
+
+/* 그리드 라인 */
+.grid-line{position:absolute;top:0;bottom:0;pointer-events:none}
+.grid-line.quarter{border-left:1px solid rgba(255,255,255,.08)}
+.grid-line.month{border-left:1px solid rgba(255,255,255,.04)}
+.grid-line.week{border-left:1px solid rgba(255,255,255,.04)}
+.grid-line.week-month{border-left:1px solid rgba(255,255,255,.1)}
+.grid-line.today{border-left:2px solid #facc15;z-index:5}
+/* 오늘 라벨 (헤더에 붙는 삼각형 핀) */
+.today-pin{position:absolute;top:0;width:2px;background:#facc15;z-index:6;pointer-events:none}
+.today-pin::before{content:'TODAY';position:absolute;top:0;left:3px;font-size:8px;font-weight:700;color:#facc15;letter-spacing:.5px;white-space:nowrap}
+/* 주 단위 시간축 */
+.time-col-week-row{position:absolute;top:22px;height:42px;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--muted);border-right:1px solid rgba(255,255,255,.06);white-space:nowrap}
+.time-col-week-row.today-w{color:#facc15;font-weight:700}
+
+/* 차트 행 */
+.chart-row{height:var(--row-h);position:relative;border-bottom:1px solid var(--border)}
+.chart-row.epic-row{background:rgba(124,58,237,.04)}
+.chart-row:hover{background:rgba(255,255,255,.02)}
+
+/* 바 */
+.bar{position:absolute;top:5px;height:18px;border-radius:4px;cursor:pointer;transition:filter .15s,transform .15s;display:flex;align-items:center;overflow:hidden}
+.bar:hover{filter:brightness(1.25);transform:scaleY(1.08)}
+.bar-fill{height:100%;border-radius:4px;position:absolute;top:0;left:0;opacity:.35}
+.bar-label{position:absolute;left:6px;right:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;font-weight:500;z-index:2;pointer-events:none}
+.bar.epic{height:22px;top:3px;border-radius:3px}
+.bar.sub{height:14px;top:7px;border-radius:2px}
+
+/* 상태별 색상 */
+.bar.done{background:#22c55e;color:#052e16}
+.bar.final{background:#16a34a;color:#052e16}
+.bar.wip{background:#f59e0b;color:#451a03}
+.bar.backlog{background:#4a5568;color:#e2e8f0}
+.bar.review{background:#7c3aed;color:#f5f3ff}
+
+/* 툴팁 */
+#tooltip{position:fixed;background:#1e2230;border:1px solid #3a4055;border-radius:8px;padding:10px 14px;font-size:11px;line-height:1.7;pointer-events:none;z-index:9999;max-width:280px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#tooltip .tt-title{font-weight:600;color:#fff;margin-bottom:4px}
+#tooltip .tt-row{display:flex;gap:6px;color:var(--muted)}
+#tooltip .tt-row span{color:var(--text)}
+#tooltip .tt-prog{margin-top:6px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+#tooltip .tt-prog-fill{height:100%;border-radius:2px;background:var(--accent)}
+
+/* 스크롤 동기화 안내 */
+.scroll-hint{position:absolute;bottom:12px;right:16px;font-size:10px;color:var(--muted);pointer-events:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🏟️ HEAT BG Team — Gantt Chart</h1>
+    <small>C2U_HQ_HEAT_BACKGROUND · 2026.05.27 기준</small>
+  </div>
+  <div class="ctrl">
+    <input type="text" id="search" placeholder="🔍 검색…" oninput="applyFilters()">
+    <select id="fStatus" onchange="applyFilters()">
+      <option value="">모든 상태</option>
+      <option value="완료">완료</option>
+      <option value="최종완료">최종완료</option>
+      <option value="진행 중">진행 중</option>
+      <option value="Backlog">Backlog</option>
+    </select>
+    <select id="fComp" onchange="applyFilters()">
+      <option value="">모든 컴포넌트</option>
+    </select>
+    <select id="fAssignee" onchange="applyFilters()">
+      <option value="">모든 담당자</option>
+    </select>
+    <button class="btn active" id="btnMonth" onclick="setScale('month')">월</button>
+    <button class="btn" id="btnWeek" onclick="setScale('week')">주</button>
+    <button class="btn" id="btnQuarter" onclick="setScale('quarter')">분기</button>
+    <button class="btn" id="btnToday" onclick="scrollToToday()">오늘</button>
+  </div>
+</header>
+
+<div class="legend">
+  <span style="font-size:10px;color:var(--muted);margin-right:4px">상태:</span>
+  <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div>완료</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#16a34a"></div>최종완료</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div>진행 중</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#4a5568"></div>Backlog</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#7c3aed"></div>재 검토</div>
+  <span style="margin-left:8px;font-size:10px;color:var(--muted)">유형:</span>
+  <div class="leg-item"><div class="leg-dot" style="background:#a78bfa"></div>Epic</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#93c5fd"></div>작업</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#67e8f9"></div>부작업</div>
+</div>
+
+<div class="gantt-wrap">
+  <div class="label-panel">
+    <div class="label-header">
+      <span class="lh-title">업무 항목</span>
+      <span class="lh-assignee">담당자</span>
+      <span class="lh-prog">진행률</span>
+    </div>
+    <div class="label-body" id="labelBody"></div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-header" id="chartHeader"></div>
+    <div class="chart-body" id="chartBody"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const TODAY = new Date('2026-05-27');
+
+// 2025 / 25 접미사 컴포넌트 제외
+function exclude2025comp(r){
+  const c = r.component || '';
+  return !(/2025$|25$/.test(c));
+}
+
+const RAW_ALL = [{"title": "[배경_컴프야2026]", "key": "CUHA-937", "type": "Epic", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야2026", "parent": "", "start": "2026-01-19", "end": "2027-06-04", "progress": 30.0}, {"title": "유니폼 관중 추가", "key": "CUHA-879", "type": "작업", "status": "완료", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-01-23", "end": "2026-02-20", "progress": 100.0}, {"title": "팀별 관중 유니폼 텍스처 제작", "key": "CUHA-880", "type": "부작업", "status": "완료", "assignee": "박지우", "component": "배경_컴프야2026", "parent": "유니폼 관중 추가", "start": "2026-01-23", "end": "2026-02-20", "progress": 100.0}, {"title": "홈/어웨이 관중 배치점 추가", "key": "CUHA-881", "type": "부작업", "status": "완료", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "유니폼 관중 추가", "start": "2026-01-26", "end": "2026-01-29", "progress": 100.0}, {"title": "일몰 재구현 개발 지원 (5월)", "key": "CUHA-1001", "type": "작업", "status": "완료", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-04-14", "end": "2026-04-30", "progress": 100.0}, {"title": "퍼펙트피처 개선 - 수여니/드리미(5월)", "key": "CUHA-1054", "type": "작업", "status": "완료", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-04-16", "end": "2026-04-30", "progress": 100.0}, {"title": "신규 제휴광고 컬쳐랜드 (5/7 라이브)", "key": "CUHA-1061", "type": "작업", "status": "완료", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-04-20", "end": "2026-04-24", "progress": 100.0}, {"title": "클래식구장 3D 관중 배치점 추가(6월납)", "key": "CUHA-805", "type": "작업", "status": "완료", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-01-19", "end": "2026-03-06", "progress": 100.0}, {"title": "클래식 구장 셰이더 깃발 적용/유니폼 관중 (6월)", "key": "CUHA-1045", "type": "작업", "status": "완료", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-04-06", "end": "2026-04-06", "progress": 100.0}, {"title": "클래식구장 컬쳐랜드 추가 (6월)", "key": "CUHA-1065", "type": "작업", "status": "Backlog", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-05-25", "end": "2026-05-29", "progress": 0.0}, {"title": "구장 최신화(27년 6월 납품목표)", "key": "CUHA-1011", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2027-04-08", "end": "2027-06-04", "progress": 0.0}, {"title": "광주구장 최신화", "key": "CUHA-1031", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "수원구장 최신화", "key": "CUHA-1032", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "인천구장 최신화", "key": "CUHA-1056", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "창원구장 최신화", "key": "CUHA-1057", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "부산구장 최신화", "key": "CUHA-1055", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "고척구장 최신화", "key": "CUHA-1058", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "대전구장 최신화", "key": "CUHA-1012", "type": "부작업", "status": "Backlog", "assignee": "권순찬", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "대구구장 최신화", "key": "CUHA-1059", "type": "부작업", "status": "Backlog", "assignee": "권순찬", "component": "배경_컴프야2026", "parent": "구장 최신화(27년 6월 납품목표)", "start": "2027-04-08", "end": "2027-06-02", "progress": 0.0}, {"title": "PBR/GI 적용 (27년 3월)", "key": "CUHA-944", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-07-27", "end": "2026-12-10", "progress": 0.0}, {"title": "대전구장 PBR/GI 적용(시안구장)", "key": "CUHA-1119", "type": "부작업", "status": "Backlog", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-07-27", "end": "2026-08-27", "progress": 0.0}, {"title": "부산구장 PBR/GI 적용", "key": "CUHA-1125", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "고척구장 PBR/GI 적용", "key": "CUHA-1120", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "인천구장 PBR/GI 적용", "key": "CUHA-1122", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "창원구장 PBR/GI 적용", "key": "CUHA-1123", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "광주구장 PBR/GI 적용", "key": "CUHA-1121", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "수원구장 PBR/GI 적용", "key": "CUHA-1118", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "대구구장 PBR/GI 적용", "key": "CUHA-1124", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "대구시민  PBR/GI 적용", "key": "CUHA-1117", "type": "부작업", "status": "Backlog", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "무등구장 PBR/GI 적용", "key": "CUHA-1116", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "마산구장 PBR/GI 적용", "key": "CUHA-1115", "type": "부작업", "status": "Backlog", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "목동구장 PBR/GI 적용", "key": "CUHA-1113", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "(구)대전구장 PBR/GI 적용", "key": "CUHA-1112", "type": "부작업", "status": "Backlog", "assignee": "신준우", "component": "배경_컴프야2026", "parent": "PBR/GI 적용 (27년 3월)", "start": "2026-10-09", "end": "2026-12-10", "progress": 0.0}, {"title": "덕아웃 선수 셰이더 및 UV 수정", "key": "CUHA-1126", "type": "작업", "status": "Backlog", "assignee": "신준우", "component": "", "parent": "[배경_컴프야2026]", "start": "2026-08-28", "end": "2026-10-15", "progress": 0.0}, {"title": "잠실종합운동장 야구장으로 개조", "key": "CUHA-1106", "type": "작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_컴프야2026", "parent": "[배경_컴프야2026]", "start": "2026-12-11", "end": "2027-02-14", "progress": 0.0}, {"title": "[배경_9이닝스2026]", "key": "CUHA-939", "type": "Epic", "status": "Backlog", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "", "start": "2025-05-08", "end": "2027-01-15", "progress": 33.33}, {"title": "3D 관중 모델데이터 및 셰이더 최적화 (1월)", "key": "CUHA-931", "type": "작업", "status": "최종완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_9이닝스2026]", "start": "2025-12-18", "end": "2026-01-06", "progress": 100.0}, {"title": "2026년 2차 퀄업 (2026년도 작업분)", "key": "CUHA-1010", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2025-05-08", "end": "2026-01-23", "progress": 100.0}, {"title": "2차 퀄업 - (ARI제외),ATL,BAL,BOS,CHC", "key": "CUHA-854", "type": "부작업", "status": "완료", "assignee": "박하랑", "component": "배경_9이닝스2026", "parent": "2026년 2차 퀄업 (2026년도 작업분)", "start": "2025-05-08", "end": "2026-01-19", "progress": 100.0}, {"title": "2차 퀄업 - TEX", "key": "CUHA-894", "type": "부작업", "status": "완료", "assignee": "임송섭", "component": "배경_9이닝스2026", "parent": "2026년 2차 퀄업 (2026년도 작업분)", "start": "2025-11-18", "end": "2026-01-20", "progress": 100.0}, {"title": "2차 퀄업 - SD", "key": "CUHA-976", "type": "부작업", "status": "완료", "assignee": "임송섭", "component": "배경_9이닝스2026", "parent": "2026년 2차 퀄업 (2026년도 작업분)", "start": "2026-01-02", "end": "2026-01-22", "progress": 100.0}, {"title": "2차 퀄업 마무리 작업", "key": "CUHA-977", "type": "부작업", "status": "완료", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "2026년 2차 퀄업 (2026년도 작업분)", "start": "2026-01-02", "end": "2026-01-23", "progress": 100.0}, {"title": "그라운드 잔디/흙 텍스처 개선", "key": "CUHA-910", "type": "부작업", "status": "완료", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "2026년 2차 퀄업 (2026년도 작업분)", "start": "2026-01-05", "end": "2026-01-23", "progress": 100.0}, {"title": "2차 퀄업구장 홈런연출 수정", "key": "CUHA-914", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-01-06", "end": "2026-01-23", "progress": 100.0}, {"title": "2차 퀄업구장 홈런연출 수정1", "key": "CUHA-917", "type": "부작업", "status": "완료", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "2차 퀄업구장 홈런연출 수정", "start": "2026-01-06", "end": "2026-01-23", "progress": 100.0}, {"title": "최적화 (셰이더/SRP배칭/미사용 UV채널 정리)(26년 3월 납품)", "key": "CUHA-811", "type": "작업", "status": "완료", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-01-24", "end": "2026-02-28", "progress": 100.0}, {"title": "KC 최신화", "key": "CUHA-989", "type": "작업", "status": "완료", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-02-02", "end": "2026-03-05", "progress": 100.0}, {"title": "전광판용 홈런 연출", "key": "CUHA-960", "type": "작업", "status": "완료", "assignee": "임송섭", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-02-11", "end": "2026-04-02", "progress": 100.0}, {"title": "CWS 바깥 근경 보강", "key": "CUHA-1003", "type": "작업", "status": "완료", "assignee": "문규현", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-03-09", "end": "2026-03-13", "progress": 100.0}, {"title": "조명 빛 메쉬/테스처 개선안 적용 (8월말 마감)", "key": "CUHA-957", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-03-16", "end": "2026-05-11", "progress": 100.0}, {"title": "조명 및 메쉬/텍스처 개선 시안", "key": "CUHA-1018", "type": "부작업", "status": "완료", "assignee": "문규현", "component": "배경_9이닝스2026", "parent": "조명 빛 메쉬/테스처 개선안 적용 (8월말 마감)", "start": "2026-03-16", "end": "2026-04-03", "progress": 100.0}, {"title": "구장별 조명 메쉬/텍스처 개선", "key": "CUHA-1024", "type": "부작업", "status": "완료", "assignee": "문규현", "component": "배경_9이닝스2026", "parent": "조명 빛 메쉬/테스처 개선안 적용 (8월말 마감)", "start": "2026-04-07", "end": "2026-05-11", "progress": 100.0}, {"title": "구장별 조명 메쉬/텍스처 개선", "key": "CUHA-1025", "type": "부작업", "status": "완료", "assignee": "임송섭", "component": "배경_9이닝스2026", "parent": "조명 빛 메쉬/테스처 개선안 적용 (8월말 마감)", "start": "2026-04-03", "end": "2026-05-07", "progress": 100.0}, {"title": "덕아웃 대기선수 UV 수정 (8월말 마감)", "key": "CUHA-1034", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "[배경_9이닝스2026]", "start": "2026-03-20", "end": "2026-07-24", "progress": 50.0}, {"title": "덕아웃 대기선수 UV 수정 시안", "key": "CUHA-1035", "type": "부작업", "status": "완료", "assignee": "신준우", "component": "", "parent": "덕아웃 대기선수 UV 수정 (8월말 마감)", "start": "2026-03-20", "end": "2026-03-26", "progress": 100.0}, {"title": "덕아웃 대기선수 UV 수정 본작업", "key": "CUHA-1036", "type": "부작업", "status": "Backlog", "assignee": "신준우", "component": "", "parent": "덕아웃 대기선수 UV 수정 (8월말 마감)", "start": "2026-07-10", "end": "2026-07-24", "progress": 0.0}, {"title": "그라운드/펜스 PBR 적용 (8월말 마감)", "key": "CUHA-909", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-03-13", "end": "2026-07-13", "progress": 25.0}, {"title": "그라운드/펜스 PBR 시안작업", "key": "CUHA-1016", "type": "부작업", "status": "완료", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "그라운드/펜스 PBR 적용 (8월말 마감)", "start": "2026-03-13", "end": "2026-04-09", "progress": 100.0}, {"title": "그라운드/펜스 PBR 본작업", "key": "CUHA-1037", "type": "부작업", "status": "진행 중", "assignee": "신준우", "component": "배경_9이닝스2026", "parent": "그라운드/펜스 PBR 적용 (8월말 마감)", "start": "2026-04-13", "end": "2026-07-10", "progress": 18.0}, {"title": "그라운드/펜스 PBR 본작업", "key": "CUHA-1042", "type": "부작업", "status": "진행 중", "assignee": "문규현", "component": "배경_9이닝스2026", "parent": "그라운드/펜스 PBR 적용 (8월말 마감)", "start": "2026-05-12", "end": "2026-07-13", "progress": 7.0}, {"title": "그라운드/펜스 PBR 본작업", "key": "CUHA-1043", "type": "부작업", "status": "진행 중", "assignee": "임송섭", "component": "배경_9이닝스2026", "parent": "그라운드/펜스 PBR 적용 (8월말 마감)", "start": "2026-05-08", "end": "2026-07-06", "progress": 10.0}, {"title": "라이트 프로브/GI 폴리싱 (8월말 마감)", "key": "CUHA-955", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-07-07", "end": "2026-08-21", "progress": 0.0}, {"title": "베이크용 그라운드 및 라이트프로브 세팅", "key": "CUHA-1103", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_9이닝스2026", "parent": "라이트 프로브/GI 폴리싱 (8월말 마감)", "start": "2026-07-07", "end": "2026-08-21", "progress": 0.0}, {"title": "베이크용 그라운드 및 라이트프로브 세팅", "key": "CUHA-1104", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_9이닝스2026", "parent": "라이트 프로브/GI 폴리싱 (8월말 마감)", "start": "2026-07-14", "end": "2026-08-20", "progress": 0.0}, {"title": "구장 최신화 (2027년 메이저)", "key": "CUHA-1091", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_9이닝스2026", "parent": "[배경_9이닝스2026]", "start": "2026-12-16", "end": "2027-01-15", "progress": 0.0}, {"title": "LAD 최신화", "key": "CUHA-1092", "type": "부작업", "status": "Backlog", "assignee": "전보영", "component": "배경_9이닝스2026", "parent": "구장 최신화 (2027년 메이저)", "start": "2026-12-16", "end": "2027-01-15", "progress": 0.0}, {"title": "[배경_컴프야V26]", "key": "CUHA-938", "type": "Epic", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "", "start": "2025-12-15", "end": "2027-01-21", "progress": 47.62}, {"title": "국가대표 신규 유니폼 추가 (26년 1월)", "key": "CUHA-919", "type": "작업", "status": "최종완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2025-12-15", "end": "2026-01-06", "progress": 100.0}, {"title": "2026년 연도갱신 인게임 일시정지 이미지 제작(1월)", "key": "CUHA-932", "type": "작업", "status": "최종완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2025-12-29", "end": "2026-01-08", "progress": 100.0}, {"title": "HOU, MIA 구장 WBC 광고 대응", "key": "CUHA-991", "type": "부작업", "status": "완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "WBC 이벤트용 구장 추가", "start": "2026-01-15", "end": "2026-01-27", "progress": 100.0}, {"title": "HOU, MIA 덕아웃 선수 UV 수정", "key": "CUHA-992", "type": "부작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "WBC 이벤트용 구장 추가", "start": "2026-01-16", "end": "2026-01-27", "progress": 100.0}, {"title": "HOU, MIA 구장 윈도우 버전 대응", "key": "CUHA-993", "type": "부작업", "status": "완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "WBC 이벤트용 구장 추가", "start": "2026-01-28", "end": "2026-02-12", "progress": 100.0}, {"title": "제휴광고 (2월)(Ink Coffee)", "key": "CUHA-999", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-02-23", "end": "2026-02-27", "progress": 100.0}, {"title": "고척돔 광고판 구성 최신화", "key": "CUHA-1004", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-03-06", "end": "2026-03-12", "progress": 100.0}, {"title": "띠광고 연도 제거 New 디자인(5월납품)", "key": "CUHA-742", "type": "작업", "status": "완료", "assignee": "전보영", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-02-16", "end": "2026-03-26", "progress": 100.0}, {"title": "조명 빛 메쉬/텍스처 개선(5월납품)", "key": "CUHA-965", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-03-02", "end": "2026-03-20", "progress": 100.0}, {"title": "구장 내 조명 메쉬/텍스처 개선", "key": "CUHA-985", "type": "부작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "조명 빛 메쉬/텍스처 개선(5월납품)", "start": "2026-03-02", "end": "2026-03-20", "progress": 100.0}, {"title": "구장 내 조명 메쉬/텍스처 개선", "key": "CUHA-984", "type": "부작업", "status": "완료", "assignee": "권순찬", "component": "배경_컴프야V26", "parent": "조명 빛 메쉬/텍스처 개선(5월납품)", "start": "2026-03-02", "end": "2026-03-20", "progress": 100.0}, {"title": "제휴광고 (5월)(컬처랜드)", "key": "CUHA-1064", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-04-27", "end": "2026-04-29", "progress": 100.0}, {"title": "잔디 등 경사로에 앉아있는 3D 관중 애니제작(6월 납품)", "key": "CUHA-794", "type": "작업", "status": "완료", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-02-13", "end": "2026-04-02", "progress": 90.0}, {"title": "경사로, 서있는 관중용 배치점 추가(6월 납품)", "key": "CUHA-1002", "type": "작업", "status": "완료", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-04-03", "end": "2026-04-25", "progress": 30.0}, {"title": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "key": "CUHA-1013", "type": "작업", "status": "진행 중", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-04-10", "end": "2026-06-05", "progress": 55.56}, {"title": "수원구장 최신화", "key": "CUHA-1033", "type": "부작업", "status": "완료", "assignee": "안민수", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 100.0}, {"title": "대전구장 최신화", "key": "CUHA-1014", "type": "부작업", "status": "진행 중", "assignee": "안민수", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 80.0}, {"title": "대구구장 최신화", "key": "CUHA-1050", "type": "부작업", "status": "Backlog", "assignee": "안민수", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 0.0}, {"title": "인천구장 최신화", "key": "CUHA-1048", "type": "부작업", "status": "완료", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 100.0}, {"title": "광주구장 최신화", "key": "CUHA-1030", "type": "부작업", "status": "진행 중", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-17", "end": "2026-06-05", "progress": 10.0}, {"title": "잠실구장 최신화", "key": "CUHA-1049", "type": "부작업", "status": "완료", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-17", "end": "2026-06-05", "progress": 100.0}, {"title": "부산구장 최신화", "key": "CUHA-1051", "type": "부작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 100.0}, {"title": "고척구장 최신화", "key": "CUHA-1052", "type": "부작업", "status": "완료", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 100.0}, {"title": "창원구장 최신화", "key": "CUHA-1053", "type": "부작업", "status": "진행 중", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "구장 최신화 (1차) - 관중 앞뒤 간격조정 병행(6월 납품)", "start": "2026-04-10", "end": "2026-06-05", "progress": 0.0}, {"title": "덕아웃/불펜 올스타 유니폼 적용 (6월)", "key": "CUHA-1111", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "[배경_컴프야V26]", "start": "2026-06-05", "end": "2026-06-09", "progress": 0.0}, {"title": "올스타 엠블럼 모델링 (6월)", "key": "CUHA-1110", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "[배경_컴프야V26]", "start": "2026-05-22", "end": "2026-06-11", "progress": 0.0}, {"title": "전광판 최신화", "key": "CUHA-962", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-06-12", "end": "2026-06-26", "progress": 0.0}, {"title": "인천 전광판 최신화", "key": "CUHA-1109", "type": "부작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "전광판 최신화", "start": "2026-06-12", "end": "2026-06-26", "progress": 0.0}, {"title": "응원구역 관중 보강", "key": "CUHA-1026", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-03-16", "end": "2026-05-29", "progress": 25.0}, {"title": "응원구역 3D 관중배치점 추가 시안 (23명 기준)", "key": "CUHA-1029", "type": "부작업", "status": "완료", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "응원구역 관중 보강", "start": "2026-03-16", "end": "2026-04-02", "progress": 100.0}, {"title": "2D 관중 앞뒤 간격 조정 시안", "key": "CUHA-1027", "type": "부작업", "status": "Backlog", "assignee": "서민우", "component": "배경_컴프야V26", "parent": "응원구역 관중 보강", "start": "2026-05-06", "end": "2026-05-29", "progress": 0.0}, {"title": "구장 최신화 (2차) - 2027년 메이저", "key": "CUHA-1093", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-11-24", "end": "2027-01-21", "progress": 0.0}, {"title": "수원구장 최신화", "key": "CUHA-1094", "type": "부작업", "status": "Backlog", "assignee": "안민수", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-11-24", "end": "2027-01-08", "progress": 0.0}, {"title": "대전구장 최신화", "key": "CUHA-1095", "type": "부작업", "status": "Backlog", "assignee": "안민수", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-11-24", "end": "2027-01-08", "progress": 0.0}, {"title": "대구구장 최신화", "key": "CUHA-1096", "type": "부작업", "status": "Backlog", "assignee": "안민수", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-11-24", "end": "2027-01-08", "progress": 0.0}, {"title": "인천구장 최신화", "key": "CUHA-1097", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-12-07", "end": "2027-01-21", "progress": 0.0}, {"title": "광주구장 최신화", "key": "CUHA-1098", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-12-07", "end": "2027-01-21", "progress": 0.0}, {"title": "잠실구장 최신화", "key": "CUHA-1099", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-12-07", "end": "2027-01-21", "progress": 0.0}, {"title": "부산구장 최신화", "key": "CUHA-1100", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-12-07", "end": "2027-01-21", "progress": 0.0}, {"title": "고척구장 최신화", "key": "CUHA-1101", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-12-07", "end": "2027-01-21", "progress": 0.0}, {"title": "창원구장 최신화", "key": "CUHA-1102", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_컴프야V26", "parent": "구장 최신화 (2차) - 2027년 메이저", "start": "2026-12-07", "end": "2027-01-21", "progress": 0.0}, {"title": "잠실종합운동장 야구장으로 개조", "key": "CUHA-1105", "type": "작업", "status": "Backlog", "assignee": "박지우", "component": "배경_컴프야V26", "parent": "[배경_컴프야V26]", "start": "2026-09-23", "end": "2027-01-21", "progress": 0.0}, {"title": "[배경_MLBRivals2026]", "key": "CUHA-941", "type": "Epic", "status": "Backlog", "assignee": "강재구", "component": "배경_MLBRivals2026", "parent": "", "start": "2025-11-27", "end": "2026-11-23", "progress": 57.89}, {"title": "구장 최신화 (26년 메이저)", "key": "CUHA-898", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2025-11-27", "end": "2026-02-12", "progress": 100.0}, {"title": "BAL 최신화", "key": "CUHA-900", "type": "부작업", "status": "완료", "assignee": "이호수", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2025-11-27", "end": "2025-12-18", "progress": 100.0}, {"title": "CLE 최신화", "key": "CUHA-901", "type": "부작업", "status": "완료", "assignee": "이호수", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2025-12-19", "end": "2026-01-16", "progress": 100.0}, {"title": "MIN 최신화", "key": "CUHA-899", "type": "부작업", "status": "완료", "assignee": "이호수", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2026-01-19", "end": "2026-02-11", "progress": 100.0}, {"title": "WAS 최신화", "key": "CUHA-961", "type": "부작업", "status": "완료", "assignee": "이호수", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2026-01-19", "end": "2026-02-11", "progress": 100.0}, {"title": "TOR 최신화", "key": "CUHA-987", "type": "부작업", "status": "완료", "assignee": "전보영", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2026-01-21", "end": "2026-02-12", "progress": 100.0}, {"title": "KC 최신화", "key": "CUHA-988", "type": "부작업", "status": "완료", "assignee": "안민수", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2026-01-21", "end": "2026-02-12", "progress": 100.0}, {"title": "SD 최신화", "key": "CUHA-994", "type": "부작업", "status": "완료", "assignee": "임송섭", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2026-01-23", "end": "2026-02-12", "progress": 100.0}, {"title": "STL 최신화", "key": "CUHA-998", "type": "부작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (26년 메이저)", "start": "2026-02-06", "end": "2026-02-12", "progress": 100.0}, {"title": "MLB AM 로고/게임로고 갱신", "key": "CUHA-923", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2025-12-15", "end": "2026-01-06", "progress": 100.0}, {"title": "베이스 전용 텍스처 분리 제작", "key": "CUHA-887", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-01-12", "end": "2026-02-04", "progress": 100.0}, {"title": "초반 동선 개선 (클럽하우스 팀 대응)(3월)", "key": "CUHA-920", "type": "작업", "status": "완료", "assignee": "박하랑", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-01-20", "end": "2026-02-12", "progress": 100.0}, {"title": "MLB9INNINGS RIVALS26 로고 적용", "key": "CUHA-995", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-01-21", "end": "2026-02-26", "progress": 100.0}, {"title": "덕아웃 선수 WBC 유니폼 추가(2월)", "key": "CUHA-996", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-01-28", "end": "2026-02-04", "progress": 100.0}, {"title": "WBC 용 미국 국기 3D 로고 추가(2월)", "key": "CUHA-997", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-01-28", "end": "2026-02-04", "progress": 100.0}, {"title": "인게임 일시정지 이미지 갱신 (3월 납품)", "key": "CUHA-1000", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-02-23", "end": "2026-02-27", "progress": 100.0}, {"title": "스팀버전 GPU 잔디 메터리얼 로비/인게임 톤밸런싱", "key": "CUHA-1009", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-03-06", "end": "2026-03-12", "progress": 100.0}, {"title": "스팀버전 TEX 구장 외야 상단 3D 관중 추가", "key": "CUHA-1015", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-03-09", "end": "2026-03-12", "progress": 100.0}, {"title": "덕아웃 선수 밝기, 포수 뒤 광고 수정(롤링>LED)", "key": "CUHA-1047", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-03-20", "end": "2026-04-03", "progress": 100.0}, {"title": "띠광고 연도 제거 New 디자인", "key": "CUHA-741", "type": "작업", "status": "진행 중", "assignee": "전보영", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-03-12", "end": "2026-05-18", "progress": 90.0}, {"title": "조명 빛 메쉬/텍스처 개선안 적용", "key": "CUHA-967", "type": "작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-06-08", "end": "2026-08-19", "progress": 0.0}, {"title": "구장 최신화 (27년 메이저)", "key": "CUHA-1067", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_MLBRivals2026", "parent": "[배경_MLBRivals2026]", "start": "2026-11-02", "end": "2026-11-23", "progress": 0.0}, {"title": "LAD 최신화", "key": "CUHA-1068", "type": "부작업", "status": "Backlog", "assignee": "안민수", "component": "배경_MLBRivals2026", "parent": "구장 최신화 (27년 메이저)", "start": "2026-11-02", "end": "2026-11-23", "progress": 0.0}, {"title": "올스타 로비용 로고판넬 제작(6월 납품)", "key": "CUHA-1108", "type": "작업", "status": "완료", "assignee": "강재구", "component": "", "parent": "[배경_MLBRivals2026]", "start": "2026-05-15", "end": "2026-05-19", "progress": 100.0}, {"title": "[배경_NPB라이징2026]", "key": "CUHA-940", "type": "Epic", "status": "Backlog", "assignee": "강재구", "component": "배경_NPB라이징2026", "parent": "", "start": "2025-12-15", "end": "2027-02-04", "progress": 53.85}, {"title": "에스콘필드 오픈돔 (3월 납품)", "key": "CUHA-866", "type": "작업", "status": "완료", "assignee": "박지우", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2025-12-15", "end": "2026-01-22", "progress": 100.0}, {"title": "도쿄돔 1,3루 외야 1층 스텐드 관중석 구조 수정", "key": "CUHA-933", "type": "작업", "status": "완료", "assignee": "안민수", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2025-12-19", "end": "2026-01-20", "progress": 100.0}, {"title": "2026구장선택/일시정지용 이미지 제작(3월납품)", "key": "CUHA-922", "type": "New Feature", "status": "완료", "assignee": "강재구", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-01-05", "end": "2026-01-09", "progress": 100.0}, {"title": "덕아웃/불펜 선수 유니폼 최신화", "key": "CUHA-1019", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-03-16", "end": "2026-03-18", "progress": 100.0}, {"title": "관중 유니폼 최신화", "key": "CUHA-1020", "type": "작업", "status": "완료", "assignee": "서민우", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-03-16", "end": "2026-03-18", "progress": 100.0}, {"title": "조명 빛 메쉬/텍스처 개선안 적용", "key": "CUHA-1021", "type": "작업", "status": "완료", "assignee": "강재구", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-03-23", "end": "2026-04-23", "progress": 100.0}, {"title": "구장 내 조명 메쉬 및 텍스처 개선", "key": "CUHA-1023", "type": "부작업", "status": "완료", "assignee": "권순찬", "component": "배경_NPB라이징2026", "parent": "조명 빛 메쉬/텍스처 개선안 적용", "start": "2026-03-23", "end": "2026-04-23", "progress": 100.0}, {"title": "홈런더비 이벤트용 구장 제작", "key": "CUHA-1046", "type": "작업", "status": "진행 중", "assignee": "박지우", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-04-07", "end": "2026-05-22", "progress": 95.0}, {"title": "2027년 구장 실장 대응 (1차 사진반영)", "key": "CUHA-1074", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-08-21", "end": "2026-10-08", "progress": 0.0}, {"title": "도쿄돔", "key": "CUHA-1075", "type": "부작업", "status": "Backlog", "assignee": "서민우", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "교세라돔", "key": "CUHA-1082", "type": "부작업", "status": "Backlog", "assignee": "서민우", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "에스콘필드", "key": "CUHA-1081", "type": "부작업", "status": "Backlog", "assignee": "서민우", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "한신고시엔", "key": "CUHA-1076", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-24", "end": "2026-10-08", "progress": 0.0}, {"title": "라쿠텐", "key": "CUHA-1077", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-24", "end": "2026-10-08", "progress": 0.0}, {"title": "반테린", "key": "CUHA-1078", "type": "부작업", "status": "Backlog", "assignee": "임송섭", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-24", "end": "2026-10-08", "progress": 0.0}, {"title": "페이페이", "key": "CUHA-1079", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "요코하마", "key": "CUHA-1084", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "마즈다", "key": "CUHA-1083", "type": "부작업", "status": "Backlog", "assignee": "문규현", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "메이지진구", "key": "CUHA-1085", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "베루나", "key": "CUHA-1080", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "조조마린", "key": "CUHA-1086", "type": "부작업", "status": "Backlog", "assignee": "박하랑", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 대응 (1차 사진반영)", "start": "2026-08-21", "end": "2026-10-05", "progress": 0.0}, {"title": "2027년 구장 실장 피드백 대응", "key": "CUHA-1088", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_NPB라이징2026", "parent": "[배경_NPB라이징2026]", "start": "2026-10-06", "end": "2027-02-04", "progress": 0.0}, {"title": "2027년 실장 피드백 대응", "key": "CUHA-1089", "type": "부작업", "status": "Backlog", "assignee": "서민우", "component": "배경_NPB라이징2026", "parent": "2027년 구장 실장 피드백 대응", "start": "2026-10-06", "end": "2027-02-04", "progress": 0.0}, {"title": "CPBL 타오위엔 구장 제작 1차", "key": "CUHA-415", "type": "작업", "status": "최종완료", "assignee": "전보영", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2023-07-03", "end": "2023-07-27", "progress": 100.0}, {"title": "CPBL 타오위엔 구장 제작 2차", "key": "CUHA-487", "type": "작업", "status": "최종완료", "assignee": "전보영", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2023-12-11", "end": "2024-01-31", "progress": 100.0}, {"title": "CPBL 타오위엔 고도화", "key": "CUHA-555", "type": "작업", "status": "최종완료", "assignee": "전보영", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2024-04-16", "end": "2024-06-12", "progress": 100.0}, {"title": "CPBL 2D 관중 제작", "key": "CUHA-572", "type": "작업", "status": "최종완료", "assignee": "이호수", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2024-05-13", "end": "2024-08-27", "progress": 100.0}, {"title": "CPBL 2D 관중 간격 좁히기", "key": "CUHA-640", "type": "작업", "status": "최종완료", "assignee": "서민우", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2024-10-04", "end": "2024-10-25", "progress": 100.0}, {"title": "CPBL 2D 관중 추가 제작", "key": "CUHA-644", "type": "작업", "status": "최종완료", "assignee": "박지우", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2025-02-10", "end": "2025-03-27", "progress": 100.0}, {"title": "차세대 그래픽 - 공용 식생", "key": "CUHA-682", "type": "작업", "status": "완료", "assignee": "이호수", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2025-02-28", "end": "2025-03-28", "progress": 100.0}, {"title": "차세대용 공용 모델링", "key": "CUHA-723", "type": "작업", "status": "완료", "assignee": "전보영", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2025-03-06", "end": "2025-04-04", "progress": 100.0}, {"title": "CPBL 타이중 저우지 구장 1차", "key": "CUHA-685", "type": "작업", "status": "완료", "assignee": "안민수", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2025-02-10", "end": "2025-03-27", "progress": 100.0}, {"title": "신규입사자 트레이닝 Rod Laver Arena", "key": "CUHA-936", "type": "작업", "status": "완료", "assignee": "권순찬", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2025-10-27", "end": "2026-01-19", "progress": 100.0}, {"title": "Rod Laver Arena 야간씬 추가 제작", "key": "CUHA-986", "type": "부작업", "status": "완료", "assignee": "권순찬", "component": "배경_기타 작업", "parent": "신규입사자 트레이닝 Rod Laver Arena", "start": "2026-01-20", "end": "2026-02-27", "progress": 100.0}, {"title": "차기 공용 PBR트림시트 제작방식 R&D", "key": "CUHA-1005", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-03-03", "end": "2026-03-31", "progress": 0.0}, {"title": "PBR 트림시트 R&D", "key": "CUHA-1006", "type": "부작업", "status": "진행 중", "assignee": "이호수", "component": "배경_기타 작업", "parent": "차기 공용 PBR트림시트 제작방식 R&D", "start": "2026-03-03", "end": "2026-03-31", "progress": 100.0}, {"title": "PBR 트림시트 R&D", "key": "CUHA-1007", "type": "부작업", "status": "진행 중", "assignee": "안민수", "component": "배경_기타 작업", "parent": "차기 공용 PBR트림시트 제작방식 R&D", "start": "2026-03-03", "end": "2026-03-31", "progress": 100.0}, {"title": "PBR 트림시트 R&D", "key": "CUHA-1008", "type": "부작업", "status": "진행 중", "assignee": "박지우", "component": "배경_기타 작업", "parent": "차기 공용 PBR트림시트 제작방식 R&D", "start": "2026-03-03", "end": "2026-03-31", "progress": 100.0}, {"title": "CPBL 타이중 저우지 구장 모델링 방식 변경", "key": "CUHA-884", "type": "작업", "status": "진행 중", "assignee": "안민수", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-06-08", "end": "2026-10-08", "progress": 0.0}, {"title": "CPBL 가오슝 시립 청칭후 구장", "key": "CUHA-749", "type": "작업", "status": "진행 중", "assignee": "이호수", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-04-01", "end": "2026-07-30", "progress": 35.0}, {"title": "CPBL 신좡 구장", "key": "CUHA-683", "type": "작업", "status": "진행 중", "assignee": "권순찬", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-04-24", "end": "2026-08-21", "progress": 12.0}, {"title": "CPBL 타이베이 시립 톈무 구장", "key": "CUHA-684", "type": "작업", "status": "Backlog", "assignee": "전보영", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-08-17", "end": "2026-12-15", "progress": 0.0}, {"title": "CPBL 타이난 APC", "key": "CUHA-686", "type": "작업", "status": "진행 중", "assignee": "박지우", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-05-25", "end": "2026-09-22", "progress": 5.0}, {"title": "CPBL 타오위안 PBR/트림시트 적용", "key": "CUHA-1066", "type": "작업", "status": "진행 중", "assignee": "전보영", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-05-19", "end": "2026-08-14", "progress": 9.0}, {"title": "CPBL 타이페이 돔 구장 제작", "key": "CUHA-885", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-06-01", "end": "2026-09-29", "progress": 0.0}, {"title": "CPBL 구장 GI 생성", "key": "CUHA-1069", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-10-09", "end": "2026-12-31", "progress": 0.0}, {"title": "베이크용 그라운드 메쉬 및 라이트 프로브 세팅", "key": "CUHA-1071", "type": "부작업", "status": "Backlog", "assignee": "이호수", "component": "배경_기타 작업", "parent": "CPBL 구장 GI 생성", "start": "2026-10-09", "end": "2026-12-31", "progress": 0.0}, {"title": "베이크용 그라운드 메쉬 및 라이트 프로브 세팅", "key": "CUHA-1072", "type": "부작업", "status": "Backlog", "assignee": "안민수", "component": "배경_기타 작업", "parent": "CPBL 구장 GI 생성", "start": "2026-10-09", "end": "2026-10-29", "progress": 0.0}, {"title": "CPBL 구장 세팅/톤밸런싱/오류체크/수정", "key": "CUHA-1073", "type": "작업", "status": "Backlog", "assignee": "이호수", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-08-03", "end": "2026-12-31", "progress": 0.0}, {"title": "CPBL 로비용 GPU Instancing 잔디 배치", "key": "CUHA-1087", "type": "작업", "status": "Backlog", "assignee": "권순찬", "component": "배경_기타 작업", "parent": "[배경_기타 작업2026]", "start": "2026-08-24", "end": "2026-10-06", "progress": 0.0}, {"title": "[배경_지라테스트]", "key": "CUHA-868", "type": "Epic", "status": "Backlog", "assignee": "강재구", "component": "배경_지라테스트", "parent": "", "start": "2025-11-13", "end": "2025-11-29", "progress": 0.0}, {"title": "상위 작업A", "key": "CUHA-869", "type": "작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "[배경_지라테스트]", "start": "2025-11-13", "end": "2025-11-29", "progress": 0.0}, {"title": "Blocks 다음일감 연결", "key": "CUHA-873", "type": "부작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "상위 작업A", "start": "2025-11-13", "end": "2025-11-17", "progress": 0.0}, {"title": "is blocked by 선행일감 연결", "key": "CUHA-872", "type": "부작업", "status": "Backlog", "assignee": "강재구", "component": "", "parent": "상위 작업A", "start": "2025-11-18", "end": "2025-11-29", "progress": 0.0}];
+
+// ── 상태 유틸 ──
+function statusCls(s){
+  const m={'완료':'done','최종완료':'final','진행 중':'wip','Backlog':'backlog','재 검토':'review'};
+  return m[s]||'backlog';
+}
+function typePip(t){
+  if(t==='Epic') return '#a78bfa';
+  if(t==='부작업') return '#67e8f9';
+  if(t==='New Feature') return '#fdba74';
+  return '#93c5fd';
+}
+
+// ── 필터 옵션 채우기 ──
+const RAW = RAW_ALL.filter(exclude2025comp);
+const comps=[...new Set(RAW.map(r=>r.component).filter(Boolean))].sort();
+const assignees=[...new Set(RAW.map(r=>r.assignee).filter(Boolean))].sort();
+const fComp=document.getElementById('fComp');
+const fAss=document.getElementById('fAssignee');
+comps.forEach(c=>{const o=document.createElement('option');o.value=o.textContent=c;fComp.appendChild(o)});
+assignees.forEach(a=>{const o=document.createElement('option');o.value=o.textContent=a;fAss.appendChild(o)});
+
+// ── 스케일 ──
+let scale='month'; // 'week' | 'month' | 'quarter'
+const COL_W_W=28;  // 주별 픽셀 너비
+const COL_W_M=60;  // 월별 픽셀 너비
+const COL_W_Q=200; // 분기별 픽셀 너비
+
+// 전체 날짜 범위
+const RANGE_START = new Date('2025-07-01');
+const RANGE_END   = new Date('2027-07-01');
+const RANGE_MS    = RANGE_END - RANGE_START;
+
+function monthsBetween(a,b){
+  return (b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
+}
+
+// ── 주 목록 (월요일 기준) ──
+function genWeeks(){
+  const weeks=[];
+  // RANGE_START 이전 첫 번째 월요일부터 시작
+  let d=new Date(RANGE_START);
+  const dow=d.getDay(); // 0=일
+  const toMon=dow===0?1:(dow===1?0:8-dow);
+  d.setDate(d.getDate()-dow+(dow===0?-6:1)); // 이전 월요일
+  while(d<RANGE_END){
+    weeks.push(new Date(d));
+    d.setDate(d.getDate()+7);
+  }
+  return weeks;
+}
+
+// ── 월 목록 생성 ──
+function genMonths(){
+  const months=[];
+  let d=new Date(RANGE_START);
+  while(d<RANGE_END){
+    months.push(new Date(d));
+    d.setMonth(d.getMonth()+1);
+  }
+  return months;
+}
+
+function getTotalW(){
+  if(scale==='week') return genWeeks().length*COL_W_W;
+  if(scale==='month') return genMonths().length*COL_W_M;
+  return Math.ceil(monthsBetween(RANGE_START,RANGE_END)/3)*COL_W_Q;
+}
+
+function dateToX(d){
+  const dt=typeof d==='string'?new Date(d):d;
+  const ms=dt-RANGE_START;
+  return (ms/RANGE_MS)*getTotalW();
+}
+
+// ── 필터된 데이터 ──
+let filteredData=[...RAW];
+// collapse 상태
+let collapsed=new Set();
+
+function applyFilters(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const fs=document.getElementById('fStatus').value;
+  const fc=document.getElementById('fComp').value;
+  const fa=document.getElementById('fAssignee').value;
+  filteredData=RAW.filter(r=>{
+    if(q&&!(r.title.toLowerCase().includes(q)||r.key.toLowerCase().includes(q)||r.assignee.toLowerCase().includes(q))) return false;
+    if(fs&&r.status!==fs) return false;
+    if(fc&&r.component!==fc) return false;
+    if(fa&&r.assignee!==fa) return false;
+    return true;
+  });
+  render();
+}
+
+function setScale(s){
+  scale=s;
+  document.getElementById('btnWeek').classList.toggle('active',s==='week');
+  document.getElementById('btnMonth').classList.toggle('active',s==='month');
+  document.getElementById('btnQuarter').classList.toggle('active',s==='quarter');
+  render();
+  setTimeout(scrollToToday,30);
+}
+
+// ── 툴팁 ──
+const tooltip=document.getElementById('tooltip');
+function showTT(e,row){
+  const prog=row.progress||0;
+  tooltip.style.display='block';
+  tooltip.innerHTML=`
+    <div class="tt-title">${row.title}</div>
+    <div class="tt-row"><span>${row.key}</span></div>
+    <div class="tt-row">상태 <span>${row.status}</span></div>
+    <div class="tt-row">담당자 <span>${row.assignee||'—'}</span></div>
+    <div class="tt-row">시작 <span>${row.start}</span></div>
+    <div class="tt-row">종료 <span>${row.end}</span></div>
+    <div class="tt-row">진행률 <span>${prog}%</span></div>
+    <div class="tt-prog"><div class="tt-prog-fill" style="width:${prog}%"></div></div>`;
+  moveTT(e);
+}
+function moveTT(e){
+  const x=e.clientX+14,y=e.clientY-10;
+  tooltip.style.left=Math.min(x,window.innerWidth-290)+'px';
+  tooltip.style.top=Math.max(y,4)+'px';
+}
+function hideTT(){tooltip.style.display='none'}
+
+// ── 렌더 ──
+function render(){
+  const totalW=getTotalW();
+  const ROW_H=28;
+
+  // 표시할 행 결정 (collapse 고려)
+  const visibleRows=[];
+  for(const row of filteredData){
+    // 부모가 collapse 되어 있으면 숨김
+    if(row.parent && collapsed.has(row.parent)) continue;
+    if(row.parent){
+      const grandParent=filteredData.find(r=>r.title===row.parent);
+      if(grandParent && grandParent.parent && collapsed.has(grandParent.parent)) continue;
+    }
+    visibleRows.push(row);
+  }
+
+  const totalH=visibleRows.length*ROW_H;
+
+  // ── 헤더 ──
+  const header=document.getElementById('chartHeader');
+  header.style.position='relative';
+  header.innerHTML='';
+  const axisDiv=document.createElement('div');
+  axisDiv.className='time-axis';
+  axisDiv.style.width=totalW+'px';
+  axisDiv.style.height='100%';
+
+  if(scale==='week'){
+    const weeks=genWeeks();
+    const MON2=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    // 상단: 월 구분
+    let curMonth=-1, curYr=-1, mStart=0;
+    weeks.forEach((w,i)=>{
+      const wEnd=new Date(w); wEnd.setDate(w.getDate()+6);
+      const mo=w.getMonth(), yr=w.getFullYear();
+      if(mo!==curMonth||yr!==curYr){
+        if(curMonth>=0){
+          const el=document.createElement('div');
+          el.className='time-col-q';
+          el.style.left=(mStart*COL_W_W)+'px';
+          el.style.width=((i-mStart)*COL_W_W)+'px';
+          el.textContent=`${curYr} ${MON2[curMonth]}`;
+          axisDiv.appendChild(el);
+        }
+        curMonth=mo; curYr=yr; mStart=i;
+      }
+    });
+    // 마지막 월
+    const el2=document.createElement('div');
+    el2.className='time-col-q';
+    el2.style.left=(mStart*COL_W_W)+'px';
+    el2.style.width=((weeks.length-mStart)*COL_W_W)+'px';
+    el2.textContent=`${curYr} ${MON2[curMonth]}`;
+    axisDiv.appendChild(el2);
+
+    // 하단: 주차 레이블 (월/일)
+    weeks.forEach((w,i)=>{
+      const isTodayWeek=w<=TODAY&&TODAY<new Date(w.getTime()+7*86400000);
+      const el=document.createElement('div');
+      el.className='time-col-week-row'+(isTodayWeek?' today-w':'');
+      el.style.left=(i*COL_W_W)+'px';
+      el.style.width=COL_W_W+'px';
+      const d=w.getDate(), mo=w.getMonth()+1;
+      el.textContent=COL_W_W>=28?`${mo}/${d}`:'';
+      el.title=`${w.getFullYear()}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      axisDiv.appendChild(el);
+    });
+
+  } else if(scale==='month'){
+    const months=genMonths();
+    // 분기 레이블
+    const quarters={};
+    months.forEach((m,i)=>{
+      const q=Math.floor(m.getMonth()/3);
+      const yr=m.getFullYear();
+      const key=`${yr}-Q${q+1}`;
+      if(!quarters[key]) quarters[key]={x:i*COL_W_M,count:0,label:`${yr} Q${q+1}`};
+      quarters[key].count++;
+    });
+    Object.values(quarters).forEach(qr=>{
+      const el=document.createElement('div');
+      el.className='time-col-q';
+      el.style.left=qr.x+'px';
+      el.style.width=(qr.count*COL_W_M)+'px';
+      el.textContent=qr.label;
+      axisDiv.appendChild(el);
+    });
+    // 월 레이블
+    const MON=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    months.forEach((m,i)=>{
+      const isToday=m.getFullYear()===TODAY.getFullYear()&&m.getMonth()===TODAY.getMonth();
+      const el=document.createElement('div');
+      el.className='time-col-m'+(isToday?' today-m':'');
+      el.style.left=(i*COL_W_M)+'px';
+      el.style.width=COL_W_M+'px';
+      el.textContent=MON[m.getMonth()];
+      axisDiv.appendChild(el);
+    });
+  } else {
+    // 분기 스케일
+    const qs=[];
+    let cur=new Date(RANGE_START);
+    while(cur<RANGE_END){
+      qs.push(new Date(cur));
+      cur.setMonth(cur.getMonth()+3);
+    }
+    qs.forEach((q,i)=>{
+      const qn=Math.floor(q.getMonth()/3)+1;
+      const el=document.createElement('div');
+      el.className='time-col-q';
+      el.style.left=(i*COL_W_Q)+'px';
+      el.style.width=COL_W_Q+'px';
+      el.style.height='100%';
+      el.textContent=`${q.getFullYear()} Q${qn}`;
+      axisDiv.appendChild(el);
+    });
+  }
+
+  // 오늘 핀 (헤더 위)
+  const todayX=dateToX(TODAY);
+  const pin=document.createElement('div');
+  pin.className='today-pin';
+  pin.style.left=todayX+'px';
+  pin.style.height='100%';
+  axisDiv.appendChild(pin);
+
+  header.appendChild(axisDiv);
+
+  // ── 차트 본문 ──
+  const body=document.getElementById('chartBody');
+  body.innerHTML='';
+  const canvas=document.createElement('div');
+  canvas.style.cssText=`position:relative;width:${totalW}px;height:${totalH}px;`;
+
+  // 그리드 라인
+  if(scale==='week'){
+    const weeks=genWeeks();
+    weeks.forEach((w,i)=>{
+      const isMonthStart=w.getDate()<=7;
+      const gl=document.createElement('div');
+      gl.className='grid-line '+(isMonthStart?'week-month':'week');
+      gl.style.left=(i*COL_W_W)+'px';
+      canvas.appendChild(gl);
+    });
+  } else if(scale==='month'){
+    const months=genMonths();
+    months.forEach((m,i)=>{
+      const isQ=m.getMonth()%3===0;
+      const gl=document.createElement('div');
+      gl.className='grid-line '+(isQ?'quarter':'month');
+      gl.style.left=(i*COL_W_M)+'px';
+      canvas.appendChild(gl);
+    });
+  } else {
+    const qs=[];
+    let cur=new Date(RANGE_START);
+    while(cur<RANGE_END){ qs.push(new Date(cur)); cur.setMonth(cur.getMonth()+3); }
+    qs.forEach((q,i)=>{
+      const gl=document.createElement('div');
+      gl.className='grid-line quarter';
+      gl.style.left=(i*COL_W_Q)+'px';
+      canvas.appendChild(gl);
+    });
+  }
+  // 오늘 라인 (노랑)
+  const todayLine=document.createElement('div');
+  todayLine.id='todayLine';
+  todayLine.className='grid-line today';
+  todayLine.style.left=todayX+'px';
+  canvas.appendChild(todayLine);
+
+  // 행 & 바
+  visibleRows.forEach((row,i)=>{
+    const rowDiv=document.createElement('div');
+    rowDiv.className='chart-row'+(row.type==='Epic'?' epic-row':'');
+    rowDiv.style.top=(i*ROW_H)+'px';
+    rowDiv.style.position='absolute';
+    rowDiv.style.left='0';
+    rowDiv.style.right='0';
+    rowDiv.style.height=ROW_H+'px';
+
+    // 바 그리기
+    const s=new Date(row.start), e=new Date(row.end);
+    if(s<=RANGE_END && e>=RANGE_START){
+      const x=Math.max(0,dateToX(s));
+      // 종료일 다음날 0시 기준으로 너비 계산 (하루 포함)
+      const eNext=new Date(e); eNext.setDate(e.getDate()+1);
+      const x2=Math.min(totalW,dateToX(eNext));
+      const w=Math.max(x2-x, scale==='week'?3:4);
+
+      const bar=document.createElement('div');
+      bar.className='bar '+statusCls(row.status)+(row.type==='Epic'?' epic':row.type==='부작업'?' sub':'');
+      bar.style.left=x+'px';
+      bar.style.width=w+'px';
+
+      // 진행률 오버레이
+      if(row.progress>0){
+        const fill=document.createElement('div');
+        fill.className='bar-fill';
+        fill.style.width=row.progress+'%';
+        fill.style.background='rgba(255,255,255,.3)';
+        bar.appendChild(fill);
+      }
+
+      // 레이블 (충분한 너비일 때)
+      if(w>50){
+        const lbl=document.createElement('div');
+        lbl.className='bar-label';
+        lbl.textContent=row.title;
+        bar.appendChild(lbl);
+      }
+
+      bar.addEventListener('mouseenter',e=>showTT(e,row));
+      bar.addEventListener('mousemove',moveTT);
+      bar.addEventListener('mouseleave',hideTT);
+      rowDiv.appendChild(bar);
+    }
+    canvas.appendChild(rowDiv);
+  });
+  body.appendChild(canvas);
+
+  // ── 라벨 패널 ──
+  const labelBody=document.getElementById('labelBody');
+  labelBody.innerHTML='';
+
+  // 아바타 색상
+  function avColor(name){
+    if(!name) return '#4a5568';
+    const colors=['#4f8ef7','#7c3aed','#f59e0b','#22c55e','#f97316','#ec4899','#06b6d4','#84cc16','#ef4444','#8b5cf6'];
+    let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff;
+    return colors[h%colors.length];
+  }
+  // 진행률 바 색상
+  function progColor(p){
+    if(p>=100) return '#22c55e';
+    if(p>=50) return '#4f8ef7';
+    if(p>0) return '#f59e0b';
+    return '#4a5568';
+  }
+
+  visibleRows.forEach((row)=>{
+    const div=document.createElement('div');
+    const indent=row.type==='Epic'?0:row.type==='부작업'?2:1;
+    div.className='label-row'+(row.type==='Epic'?' epic-row':row.type==='부작업'?' sub-row':'');
+    div.style.height=ROW_H+'px';
+
+    const hasChildren=filteredData.some(r=>r.parent===row.title);
+    const isCollapsed=collapsed.has(row.title);
+    const prog=row.progress||0;
+    const assignee=row.assignee||'';
+    const avBg=avColor(assignee);
+    const avInitial=assignee?assignee[0]:'?';
+    const pColor=progColor(prog);
+
+    div.innerHTML=`
+      <span class="row-indent" style="width:${indent*12}px;flex-shrink:0"></span>
+      <span class="row-toggle">${hasChildren?(isCollapsed?'▶':'▼'):''}</span>
+      <span class="type-pip" style="background:${typePip(row.type)}"></span>
+      <span class="row-title" title="${row.title}">${row.title}</span>
+      <span class="row-assignee">
+        <span class="av" style="background:${avBg}">${avInitial}</span>
+        <span class="av-name" title="${assignee}">${assignee||'—'}</span>
+      </span>
+      <span class="row-prog">
+        <span class="pn">${prog?Math.round(prog)+'%':'—'}</span>
+        <span class="pb"><span class="pb-fill" style="width:${prog}%"></span></span>
+      </span>
+    `;
+    if(hasChildren){
+      div.addEventListener('click',()=>{
+        if(collapsed.has(row.title)) collapsed.delete(row.title);
+        else collapsed.add(row.title);
+        render();
+      });
+    }
+    labelBody.appendChild(div);
+  });
+
+  // 스크롤 동기화
+  const chartHeader=document.getElementById('chartHeader');
+  labelBody.onscroll=()=>{ body.scrollTop=labelBody.scrollTop; };
+  body.onscroll=()=>{
+    labelBody.scrollTop=body.scrollTop;
+    chartHeader.scrollLeft=body.scrollLeft;
+  };
+  // 초기 헤더 위치 맞춤
+  chartHeader.scrollLeft=body.scrollLeft;
+}
+
+function scrollToToday(){
+  const x=dateToX(TODAY);
+  const panel=document.getElementById('chartBody');
+  const header=document.getElementById('chartHeader');
+  const viewW=panel.clientWidth||800;
+  const pos=Math.max(0,x-viewW/2);
+  panel.scrollLeft=pos;
+  header.scrollLeft=pos;
+}
+
+// 초기 렌더
+render();
+// 오늘로 스크롤 (약간 딜레이)
+setTimeout(scrollToToday,100);
+</script>
+</body>
+</html>
