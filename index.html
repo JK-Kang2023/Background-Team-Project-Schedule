@@ -144,32 +144,39 @@ function applyFilters(){
   const fc=document.getElementById('fComp').value;
   const fa=document.getElementById('fAss').value;
 
-  // 1. 직접 매칭
-  const directMatch=new Set(RAW.filter(r=>{
+  // 1. 직접 매칭 (key 기준 — 고유값)
+  const directKeys=new Set(RAW.filter(r=>{
     if(q&&!(r.title.toLowerCase().includes(q)||r.key.toLowerCase().includes(q)||r.assignee.toLowerCase().includes(q)))return false;
     if(fs&&r.status!==fs)return false;
     if(fc&&r.component!==fc)return false;
     if(fa&&r.assignee!==fa)return false;
     return true;
-  }).map(r=>r.title));
+  }).map(r=>r.key));
 
-  // 2. 담당자 필터가 있을 때만 상위 항목 포함
-  const ancestorTitles=new Set();
+  // 2. 담당자 필터가 있을 때만 상위 항목 key 수집 (parent는 title 기준이므로 변환)
+  const ancestorKeys=new Set();
   if(fa){
-    for(const title of directMatch){
-      const item=RAW.find(r=>r.title===title);
+    for(const key of directKeys){
+      const item=RAW.find(r=>r.key===key);
       if(item&&item.parent){
-        ancestorTitles.add(item.parent);
-        const parent=RAW.find(r=>r.title===item.parent);
-        if(parent&&parent.parent) ancestorTitles.add(parent.parent);
+        // 상위 작업 (parent title → 모든 같은 제목 중 부작업 아닌 것)
+        const parents=RAW.filter(r=>r.title===item.parent&&r.type!=='부작업');
+        parents.forEach(p=>{
+          ancestorKeys.add(p.key);
+          // 상위 Epic
+          if(p.parent){
+            const epics=RAW.filter(r=>r.title===p.parent&&r.type==='Epic');
+            epics.forEach(e=>ancestorKeys.add(e.key));
+          }
+        });
       }
     }
   }
 
-  // 3. 최종 필터: 부작업은 직접 매칭만, 작업/Epic은 상위 컨텍스트 포함
+  // 3. 최종 필터: 부작업은 직접 매칭 key만, 작업/Epic은 상위 컨텍스트 포함
   filteredData=RAW.filter(r=>{
-    if(directMatch.has(r.title)) return true;
-    if(ancestorTitles.has(r.title)&&r.type!=='부작업') return true;
+    if(directKeys.has(r.key)) return true;
+    if(ancestorKeys.has(r.key)&&r.type!=='부작업') return true;
     return false;
   });
   render();
