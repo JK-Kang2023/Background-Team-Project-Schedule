@@ -166,8 +166,12 @@ function applyFilters(){
     }
   }
 
-  // 3. 최종 필터
-  filteredData=RAW.filter(r=>directMatch.has(r.title)||ancestorTitles.has(r.title));
+  // 3. 최종 필터: 부작업은 직접 매칭만, 작업/Epic은 상위 컨텍스트 포함
+  filteredData=RAW.filter(r=>{
+    if(directMatch.has(r.title)) return true;
+    if(ancestorTitles.has(r.title)&&r.type!=='부작업') return true;
+    return false;
+  });
   render();
 }
 
