@@ -154,11 +154,19 @@ function applyFilters(){
     for(const key of directKeys){
       const item=RAW.find(r=>r.key===key);
       if(item&&item.parent){
-        const parents=RAW.filter(r=>r.title===item.parent&&r.type!=='부작업');
-        parents.forEach(p=>{
-          ancestorKeys.add(p.key);
-          if(p.parent) RAW.filter(r=>r.title===p.parent&&r.type==='Epic').forEach(e=>ancestorKeys.add(e.key));
-        });
+        if(item.type==='부작업'){
+          // 같은 title의 상위 작업이 여러 개일 때 같은 컴포넌트인 것 우선, 없으면 전체
+          let parentCandidates=RAW.filter(r=>r.title===item.parent&&r.type!=='부작업');
+          const sameComp=parentCandidates.filter(p=>p.component===item.component);
+          if(sameComp.length>0) parentCandidates=sameComp;
+          parentCandidates.forEach(p=>{
+            ancestorKeys.add(p.key);
+            if(p.parent) RAW.filter(r=>r.title===p.parent&&r.type==='Epic').forEach(e=>ancestorKeys.add(e.key));
+          });
+        } else {
+          // 작업이면: 상위 Epic만
+          RAW.filter(r=>r.title===item.parent&&r.type==='Epic').forEach(e=>ancestorKeys.add(e.key));
+        }
       }
     }
   }
