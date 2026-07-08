@@ -55,7 +55,7 @@ input::placeholder{color:var(--muted)}
 .time-axis{position:absolute;top:0;left:0;height:100%;pointer-events:none}
 .tc-upper{position:absolute;top:0;height:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--muted);border-right:1px solid var(--border);letter-spacing:.3px}
 .tc-lower{position:absolute;top:22px;height:42px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);border-right:1px solid rgba(255,255,255,.06);white-space:nowrap}
-.tc-lower.today-w,.tc-lower.today-m{color:#facc15;font-weight:700}
+.tc-lower.today-d,.tc-lower.today-w,.tc-lower.today-m{color:#facc15;font-weight:700}
 .today-pin{position:absolute;top:0;width:2px;background:#facc15;z-index:6;pointer-events:none;height:100%}
 .today-pin::before{content:'TODAY';position:absolute;top:2px;left:3px;font-size:8px;font-weight:700;color:#facc15;letter-spacing:.5px;white-space:nowrap}
 .grid-line{position:absolute;top:0;bottom:0;pointer-events:none}
@@ -63,6 +63,8 @@ input::placeholder{color:var(--muted)}
 .grid-line.month{border-left:1px solid rgba(255,255,255,.04)}
 .grid-line.week{border-left:1px solid rgba(255,255,255,.04)}
 .grid-line.week-month{border-left:1px solid rgba(255,255,255,.1)}
+.grid-line.day{border-left:1px solid rgba(255,255,255,.03)}
+.grid-line.day-month{border-left:1px solid rgba(255,255,255,.08)}
 .grid-line.today{border-left:2px solid #facc15;z-index:5}
 .bar{position:absolute;border-radius:4px;cursor:pointer;transition:filter .15s,transform .15s;display:flex;align-items:center;overflow:hidden}
 .bar:hover{filter:brightness(1.3);transform:scaleY(1.08)}
@@ -85,8 +87,9 @@ input::placeholder{color:var(--muted)}
     <select id="fStatus" onchange="applyFilters()"><option value="">모든 상태</option><option>완료</option><option>최종완료</option><option>진행 중</option><option>Backlog</option><option>재 검토</option></select>
     <select id="fComp" onchange="applyFilters()"></select>
     <select id="fAss" onchange="applyFilters()"></select>
-    <button class="btn active" id="btnMonth" onclick="setScale('month')">월</button>
+    <button class="btn" id="btnDay" onclick="setScale('day')">일</button>
     <button class="btn" id="btnWeek" onclick="setScale('week')">주</button>
+    <button class="btn active" id="btnMonth" onclick="setScale('month')">월</button>
     <button class="btn" id="btnQuarter" onclick="setScale('quarter')">분기</button>
     <button class="btn" id="btnToday" onclick="scrollToToday()">오늘</button>
   </div>
@@ -125,18 +128,35 @@ const fAss=document.getElementById('fAss');
 comps.forEach(c=>{const o=document.createElement('option');o.value=o.textContent=c;fComp.appendChild(o);});
 asss.forEach(a=>{const o=document.createElement('option');o.value=o.textContent=a;fAss.appendChild(o);});
 let scale='month';
-const CW_W=28,CW_M=60,CW_Q=200;
+const CW_D=20,CW_W=28,CW_M=60,CW_Q=200;
 const RS=new Date('2025-07-01'),RE=new Date('2027-07-01'),RMS=RE-RS;
-function genWeeks(){const w=[];let d=new Date(RS);const dw=d.getDay();d.setDate(d.getDate()-(dw===0?6:dw-1));while(d<RE){w.push(new Date(d));d.setDate(d.getDate()+7);}return w;}
+
+function genDays(){
+  const d=[];let cur=new Date(RS);
+  while(cur<RE){d.push(new Date(cur));cur.setDate(cur.getDate()+1);}
+  return d;
+}
+function genWeeks(){
+  const w=[];let d=new Date(RS);const dw=d.getDay();
+  d.setDate(d.getDate()-(dw===0?6:dw-1));
+  while(d<RE){w.push(new Date(d));d.setDate(d.getDate()+7);}
+  return w;
+}
 function genMonths(){const m=[];let d=new Date(RS);while(d<RE){m.push(new Date(d));d.setMonth(d.getMonth()+1);}return m;}
 function genQuarters(){const q=[];let d=new Date(RS);while(d<RE){q.push(new Date(d));d.setMonth(d.getMonth()+3);}return q;}
-function getTotalW(){if(scale==='week')return genWeeks().length*CW_W;if(scale==='month')return genMonths().length*CW_M;return genQuarters().length*CW_Q;}
+function getTotalW(){
+  if(scale==='day') return genDays().length*CW_D;
+  if(scale==='week') return genWeeks().length*CW_W;
+  if(scale==='month') return genMonths().length*CW_M;
+  return genQuarters().length*CW_Q;
+}
 function dateToX(d){const dt=typeof d==='string'?new Date(d):d;return((dt-RS)/RMS)*getTotalW();}
 function statusCls(s){return{완료:'done',최종완료:'final','진행 중':'wip',Backlog:'backlog','재 검토':'review'}[s]||'backlog';}
 function typePip(t){return{Epic:'#a78bfa',작업:'#93c5fd',부작업:'#67e8f9','New Feature':'#fdba74'}[t]||'#93c5fd';}
 function avColor(n){if(!n)return'#4a5568';const c=['#4f8ef7','#7c3aed','#f59e0b','#22c55e','#f97316','#ec4899','#06b6d4','#84cc16','#ef4444','#8b5cf6'];let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))&0xffff;return c[h%c.length];}
 function mkEl(tag,cls){const el=document.createElement(tag||'div');if(cls)el.className=cls;return el;}
 let filteredData=[...RAW],collapsed=new Set();
+
 function applyFilters(){
   const q=document.getElementById('search').value.toLowerCase();
   const fs=document.getElementById('fStatus').value;
@@ -175,15 +195,18 @@ function applyFilters(){
   });
   render();
 }
+
 function setScale(s){
   scale=s;
-  ['month','week','quarter'].forEach(x=>document.getElementById('btn'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===s));
+  ['day','week','month','quarter'].forEach(x=>document.getElementById('btn'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===s));
   render();setTimeout(scrollToToday,30);
 }
+
 const ttEl=document.getElementById('tt');
 function showTT(ev,r){const p=r.progress||0;ttEl.style.display='block';ttEl.innerHTML='<div class="tt-title">'+r.title+'</div><div class="tt-row"><span>'+r.key+'</span></div><div class="tt-row">상태 <span>'+r.status+'</span></div><div class="tt-row">담당자 <span>'+(r.assignee||'—')+'</span></div><div class="tt-row">시작 <span>'+r.start+'</span></div><div class="tt-row">종료 <span>'+r.end+'</span></div><div class="tt-row">진행률 <span>'+p+'%</span></div><div class="tt-prog"><div class="tt-prog-fill" style="width:'+p+'%"></div></div>';moveTT(ev);}
 function moveTT(ev){ttEl.style.left=Math.min(ev.clientX+14,window.innerWidth-290)+'px';ttEl.style.top=Math.max(ev.clientY-10,4)+'px';}
 function hideTT(){ttEl.style.display='none';}
+
 function render(){
   const totalW=getTotalW(),ROW_H=28;
   const visible=[];
@@ -198,30 +221,67 @@ function render(){
   chartHeader.innerHTML='';
   const axis=mkEl('div','time-axis');
   axis.style.cssText='width:'+totalW+'px;height:100%;position:absolute;top:0;left:0';
-  if(scale==='week'){
-    const weeks=genWeeks();let cm=-1,cy=-1,ms=0;
+
+  if(scale==='day'){
+    const days=genDays();
+    // 상단: 월 구분
+    let cm=-1,cy=-1,ms=0;
+    days.forEach((d,i)=>{
+      const mo=d.getMonth(),yr=d.getFullYear();
+      if(mo!==cm||yr!==cy){
+        if(cm>=0){const el=mkEl('div','tc-upper');el.style.cssText='left:'+ms*CW_D+'px;width:'+(i-ms)*CW_D+'px';el.textContent=cy+' '+MON[cm];axis.appendChild(el);}
+        cm=mo;cy=yr;ms=i;
+      }
+    });
+    {const el=mkEl('div','tc-upper');el.style.cssText='left:'+ms*CW_D+'px;width:'+(days.length-ms)*CW_D+'px';el.textContent=cy+' '+MON[cm];axis.appendChild(el);}
+    // 하단: 일
+    days.forEach((d,i)=>{
+      const isToday=d.getFullYear()===TODAY.getFullYear()&&d.getMonth()===TODAY.getMonth()&&d.getDate()===TODAY.getDate();
+      const el=mkEl('div','tc-lower'+(isToday?' today-d':''));
+      el.style.cssText='left:'+i*CW_D+'px;width:'+CW_D+'px';
+      el.textContent=d.getDate();
+      axis.appendChild(el);
+    });
+  } else if(scale==='week'){
+    const weeks=genWeeks();
+    let cm=-1,cy=-1,ms=0;
     weeks.forEach((w,i)=>{const mo=w.getMonth(),yr=w.getFullYear();if(mo!==cm||yr!==cy){if(cm>=0){const el=mkEl('div','tc-upper');el.style.cssText='left:'+ms*CW_W+'px;width:'+(i-ms)*CW_W+'px';el.textContent=cy+' '+MON[cm];axis.appendChild(el);}cm=mo;cy=yr;ms=i;}});
     {const el=mkEl('div','tc-upper');el.style.cssText='left:'+ms*CW_W+'px;width:'+(weeks.length-ms)*CW_W+'px';el.textContent=cy+' '+MON[cm];axis.appendChild(el);}
     weeks.forEach((w,i)=>{const itw=w<=TODAY&&TODAY<new Date(w.getTime()+7*86400000);const el=mkEl('div','tc-lower'+(itw?' today-w':''));el.style.cssText='left:'+i*CW_W+'px;width:'+CW_W+'px';el.textContent=(w.getMonth()+1)+'/'+w.getDate();axis.appendChild(el);});
-  }else if(scale==='month'){
+  } else if(scale==='month'){
     const months=genMonths();const qs={};
     months.forEach((m,i)=>{const q=Math.floor(m.getMonth()/3),yr=m.getFullYear(),k=yr+'-Q'+(q+1);if(!qs[k])qs[k]={x:i*CW_M,cnt:0,lbl:yr+' Q'+(q+1)};qs[k].cnt++;});
     Object.values(qs).forEach(q=>{const el=mkEl('div','tc-upper');el.style.cssText='left:'+q.x+'px;width:'+q.cnt*CW_M+'px';el.textContent=q.lbl;axis.appendChild(el);});
     months.forEach((m,i)=>{const itm=m.getFullYear()===TODAY.getFullYear()&&m.getMonth()===TODAY.getMonth();const el=mkEl('div','tc-lower'+(itm?' today-m':''));el.style.cssText='left:'+i*CW_M+'px;width:'+CW_M+'px';el.textContent=MON[m.getMonth()];axis.appendChild(el);});
-  }else{
+  } else {
     genQuarters().forEach((q,i)=>{const el=mkEl('div','tc-upper');el.style.cssText='left:'+i*CW_Q+'px;width:'+CW_Q+'px;height:100%';el.textContent=q.getFullYear()+' Q'+(Math.floor(q.getMonth()/3)+1);axis.appendChild(el);});
   }
+
   const todayX=dateToX(TODAY);
   const pin=mkEl('div','today-pin');pin.style.left=todayX+'px';axis.appendChild(pin);
   chartHeader.appendChild(axis);
+
   const body=document.getElementById('chartBody');
   body.innerHTML='';
   const canvas=mkEl('div');
   canvas.style.cssText='position:relative;width:'+totalW+'px;height:'+totalH+'px';
-  if(scale==='week'){genWeeks().forEach((w,i)=>{const gl=mkEl('div','grid-line '+(w.getDate()<=7?'week-month':'week'));gl.style.left=i*CW_W+'px';canvas.appendChild(gl);});}
-  else if(scale==='month'){genMonths().forEach((m,i)=>{const gl=mkEl('div','grid-line '+(m.getMonth()%3===0?'quarter':'month'));gl.style.left=i*CW_M+'px';canvas.appendChild(gl);});}
-  else{genQuarters().forEach((q,i)=>{const gl=mkEl('div','grid-line quarter');gl.style.left=i*CW_Q+'px';canvas.appendChild(gl);});}
+
+  // 그리드라인
+  if(scale==='day'){
+    genDays().forEach((d,i)=>{
+      const isMonthStart=d.getDate()===1;
+      const gl=mkEl('div','grid-line '+(isMonthStart?'day-month':'day'));
+      gl.style.left=i*CW_D+'px';canvas.appendChild(gl);
+    });
+  } else if(scale==='week'){
+    genWeeks().forEach((w,i)=>{const gl=mkEl('div','grid-line '+(w.getDate()<=7?'week-month':'week'));gl.style.left=i*CW_W+'px';canvas.appendChild(gl);});
+  } else if(scale==='month'){
+    genMonths().forEach((m,i)=>{const gl=mkEl('div','grid-line '+(m.getMonth()%3===0?'quarter':'month'));gl.style.left=i*CW_M+'px';canvas.appendChild(gl);});
+  } else {
+    genQuarters().forEach((q,i)=>{const gl=mkEl('div','grid-line quarter');gl.style.left=i*CW_Q+'px';canvas.appendChild(gl);});
+  }
   const tl=mkEl('div','grid-line today');tl.style.left=todayX+'px';canvas.appendChild(tl);
+
   visible.forEach((row,i)=>{
     const rowDiv=mkEl('div');
     rowDiv.style.cssText='position:absolute;left:0;right:0;top:'+i*ROW_H+'px;height:'+ROW_H+'px;border-bottom:1px solid var(--border)';
@@ -231,7 +291,8 @@ function render(){
       const x=Math.max(0,dateToX(s));
       const eNext=new Date(e);eNext.setDate(e.getDate()+1);
       const x2=Math.min(totalW,dateToX(eNext));
-      const w=Math.max(x2-x,scale==='week'?3:4);
+      const minW=scale==='day'?2:scale==='week'?3:4;
+      const w=Math.max(x2-x,minW);
       const barH=row.type==='Epic'?22:row.type==='부작업'?14:18;
       const barTop=Math.floor((ROW_H-barH)/2);
       const bar=mkEl('div','bar '+statusCls(row.status));
@@ -246,6 +307,7 @@ function render(){
     canvas.appendChild(rowDiv);
   });
   body.appendChild(canvas);
+
   const labelBody=document.getElementById('labelBody');
   labelBody.innerHTML='';
   visible.forEach(row=>{
@@ -264,7 +326,14 @@ function render(){
   body.onscroll=()=>{labelBody.scrollTop=body.scrollTop;chartHeader.scrollLeft=body.scrollLeft;};
   chartHeader.scrollLeft=body.scrollLeft;
 }
-function scrollToToday(){const x=dateToX(TODAY);const panel=document.getElementById('chartBody');const header=document.getElementById('chartHeader');const pos=Math.max(0,x-panel.clientWidth/2);panel.scrollLeft=pos;header.scrollLeft=pos;}
+
+function scrollToToday(){
+  const x=dateToX(TODAY);
+  const panel=document.getElementById('chartBody');
+  const header=document.getElementById('chartHeader');
+  const pos=Math.max(0,x-panel.clientWidth/2);
+  panel.scrollLeft=pos;header.scrollLeft=pos;
+}
 render();
 setTimeout(scrollToToday,100);</script>
 </body>
