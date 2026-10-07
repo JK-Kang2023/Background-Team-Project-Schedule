@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>워크숍 결제 체크</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style id="css">
+:root{
+  --bg:#EAF0F4; --surface:#FFFFFF; --ink:#13212C; --muted:#5B6B78; --line:#D3DDE4; --track:#DCE5EB;
+  --lead:#1F5FAE; --p1:#23907F; --p2:#D69A1E; --p3:#B0436B; --ok:#1F7A4D;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1820; --surface:#16232E; --ink:#E6EEF3; --muted:#93A5B3; --line:#263744; --track:#22323E;
+    --lead:#5B9BE6; --p1:#4CC2AE; --p2:#F0B848; --p3:#E07A9F; --ok:#5BC98D;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1820; --surface:#16232E; --ink:#E6EEF3; --muted:#93A5B3; --line:#263744; --track:#22323E;
+  --lead:#5B9BE6; --p1:#4CC2AE; --p2:#F0B848; --p3:#E07A9F; --ok:#5BC98D;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+#app{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;line-height:1.3;margin:0;font-weight:700;letter-spacing:-.01em}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.status{font-size:12px;color:var(--muted);white-space:nowrap;padding-top:6px}
+.status.saving{color:var(--lead)} .status.err{color:var(--p3)}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 18px}
+
+/* budget bar — the one bold element */
+.budget{background:var(--surface);border-radius:14px;padding:16px;border:1px solid var(--line)}
+.remain{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.remain .k{font-size:13px;color:var(--muted)}
+.remain .v{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.bar{display:flex;height:34px;border-radius:8px;overflow:hidden;background:var(--track);margin:12px 0 8px}
+.seg{height:100%;border-right:2px solid var(--surface);min-width:3px;transition:opacity .2s}
+.seg.todo{opacity:.35;background-image:repeating-linear-gradient(135deg,transparent 0 5px,rgba(255,255,255,.55) 5px 8px)}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.funds{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+.funds b{color:var(--ink);font-weight:600}
+
+/* payers */
+.payers{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0 6px}
+.payer{appearance:none;font:inherit;color:inherit;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;position:relative;overflow:hidden}
+.payer::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+.payer[aria-pressed="true"]{border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.payer .n{font-weight:600;font-size:14px}
+.payer .m{font-size:12px;color:var(--muted)}
+.payer .a{font-size:15px;font-weight:600;margin-top:2px}
+.filter-note{font-size:12px;color:var(--muted);min-height:18px}
+
+h2{font-size:15px;font-weight:700;margin:22px 0 4px;display:flex;justify-content:space-between;align-items:baseline}
+h2 span{font-size:12px;color:var(--muted);font-weight:500}
+.group-note{font-size:12px;color:var(--muted);margin:0 0 8px}
+
+.list{display:flex;flex-direction:column;gap:8px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:start}
+.item.done{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+.check{appearance:none;width:30px;height:30px;border-radius:9px;border:2px solid var(--line);background:transparent;cursor:pointer;display:grid;place-items:center;padding:0;grid-row:span 2;margin-top:2px}
+.check svg{width:18px;height:18px;opacity:0;transform:scale(.6);transition:transform .15s,opacity .15s}
+.check[aria-checked="true"]{background:var(--ok);border-color:var(--ok)}
+.check[aria-checked="true"] svg{opacity:1;transform:none}
+.check:disabled{cursor:default;opacity:.6}
+.row1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.name{font-weight:600}
+.item.done .name{color:var(--muted)}
+.amt{font-weight:600;white-space:nowrap}
+.row2{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);padding:2px 8px;border-radius:999px}
+.hint{font-size:12px;color:var(--muted)}
+.hint.warn{color:var(--p3)}
+.amt-in{display:flex;align-items:center;gap:6px;grid-column:2;margin-top:6px}
+.amt-in input{font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%;max-width:170px;text-align:right}
+.amt-in input:disabled{opacity:.6}
+.amt-in label{font-size:12px;color:var(--muted);white-space:nowrap}
+
+.caps{display:flex;flex-direction:column;gap:8px;margin-top:22px}
+.cap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.cap .row1{font-size:13px}
+.capbar{height:8px;border-radius:4px;background:var(--track);overflow:hidden;margin-top:8px}
+.capbar i{display:block;height:100%;background:var(--c)}
+.cap.over{border-color:var(--p3)}
+.cap.over .hint{color:var(--p3);font-weight:600}
+.foot{font-size:12px;color:var(--muted);margin-top:16px;text-align:center}
+.admin{max-width:520px;margin:0 auto;padding:0 16px 32px}
+.admin-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
+.admin-box summary{cursor:pointer;color:var(--muted)}
+.btn{font:inherit;font-weight:600;border:0;border-radius:8px;padding:7px 14px;background:var(--lead);color:#fff;cursor:pointer;white-space:nowrap}
+.linkbtn{font:inherit;font-size:12px;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:4px}
+.admin-err{color:var(--p3)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--lead);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="admin" class="admin"></div>
+<script id="app-js">
+(function(){
+const BUDGET = 5390000, WORKSHOP = 4400000, DINNER = 990000;
+const CAPS = {lead:4490000, p1:270000, p2:360000, p3:270000};
+const PAYERS = {
+  lead:{name:"팀장님", c:"var(--lead)"},
+  p1:{name:"1-파트장님", c:"var(--p1)"},
+  p2:{name:"2-파트장님", c:"var(--p2)"},
+  p3:{name:"3-파트장님", c:"var(--p3)"}
+};
+const GROUPS = [
+  {id:"g1", title:"기 결제 및 예정 결제", note:"워크숍비로 결제 · 4,490,000원까지 팀장 카드"},
+  {id:"g2", title:"프로그램 및 기타 비용", note:"실제 결제 금액을 입력하면 잔액이 정확해져요"}
+];
+const ITEMS = [
+  {id:"hotel", g:"g1", name:"호텔 숙박비", payer:"lead", min:2184050, max:2184050},
+  {id:"aqua", g:"g1", name:"아쿠아리움·서울스카이 추가비", payer:"lead", min:44000, max:44000},
+  {id:"buffet", g:"g1", name:"저녁 뷔페", payer:"lead", min:1716000, max:1716000},
+  {id:"snack", g:"g1", name:"한정선 간식", payer:"lead", min:341000, max:341000},
+  {id:"movie", g:"g2", name:"영화비", payer:"p1", min:100000, max:130000},
+  {id:"escape", g:"g2", name:"방탈출", payer:"p3", min:100000, max:130000},
+  {id:"breakfast", g:"g2", name:"아침 조식", payer:"lead", min:180000, max:200000},
+  {id:"etc", g:"g2", name:"기타 비용 (간식·음료 등)", payer:"p2", min:200000, max:200000, approx:true}
+];
+
+const REPO = "JK-Kang2023/Background-Team-Project-Schedule", PATH = "workshop/data.json";
+const API = `https://api.github.com/repos/${REPO}/contents/${PATH}`;
+const TOKEN_KEY = "workshop-pay-token";
+
+let state = normalize({});
+function normalize(d){
+  d = d && typeof d === "object" ? d : {};
+  d.items = d.items || {};
+  ITEMS.forEach(it => { if(!d.items[it.id]) d.items[it.id] = {paid:false, amount:null}; });
+  return d;
+}
+
+let filter = null, token = null, writable = false, loaded = false, saveState = "", pubTimer = null, sha = null, dirty = false;
+try { token = localStorage.getItem(TOKEN_KEY); } catch(e){}
+writable = !!token;
+
+const won = n => Math.round(n).toLocaleString("ko-KR") + "원";
+const fixed = it => it.min === it.max && !it.approx;
+const actual = it => fixed(it) ? it.min : state.items[it.id].amount;
+const estMin = it => actual(it) ?? it.min;
+const estMax = it => actual(it) ?? it.max;
+const paidAmt = it => state.items[it.id].paid ? estMax(it) : 0;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+function render(){
+  const totMin = ITEMS.reduce((s,it)=>s+estMin(it),0);
+  const totMax = ITEMS.reduce((s,it)=>s+estMax(it),0);
+  const paidTot = ITEMS.reduce((s,it)=>s+paidAmt(it),0);
+  const remMin = BUDGET - totMax, remMax = BUDGET - totMin;
+  const remTxt = remMin === remMax ? won(remMin) : `${Math.round(remMin).toLocaleString("ko-KR")} ~ ${won(remMax)}`;
+  const doneCount = ITEMS.filter(it=>state.items[it.id].paid).length;
+
+  const order = ["lead","p1","p2","p3"];
+  const segs = order.flatMap(p => ITEMS.filter(it=>it.payer===p)).map(it =>
+    `<div class="seg ${state.items[it.id].paid?"":"todo"}" style="width:${estMax(it)/BUDGET*100}%;background-color:${PAYERS[it.payer].c}" title="${esc(it.name)}"></div>`).join("");
+
+  const payerCards = order.map(p => {
+    const its = ITEMS.filter(it=>it.payer===p);
+    const done = its.filter(it=>state.items[it.id].paid).length;
+    const amt = its.reduce((s,it)=>s+paidAmt(it),0);
+    return `<button class="payer" style="--c:${PAYERS[p].c}" data-payer="${p}" aria-pressed="${filter===p}">
+      <div class="n">${PAYERS[p].name}</div>
+      <div class="a">${won(amt)}</div>
+      <div class="m">${its.length}건 중 ${done}건 결제</div></button>`;
+  }).join("");
+
+  const groups = GROUPS.map(g => {
+    const its = ITEMS.filter(it=>it.g===g.id && (!filter || it.payer===filter));
+    if(!its.length) return "";
+    const all = ITEMS.filter(it=>it.g===g.id);
+    const gMin = all.reduce((s,it)=>s+estMin(it),0), gMax = all.reduce((s,it)=>s+estMax(it),0);
+    const gTxt = gMin===gMax ? won(gMin) : `${gMin.toLocaleString("ko-KR")} ~ ${won(gMax)}`;
+    return `<h2>${g.title}<span>${gTxt}</span></h2><p class="group-note">${g.note}</p><div class="list">${its.map(itemHtml).join("")}</div>`;
+  }).join("");
+
+  const capsHtml = order.map(p => {
+    const its = ITEMS.filter(it=>it.payer===p);
+    const paid = its.reduce((t,it)=>t+paidAmt(it),0);
+    const plan = its.reduce((t,it)=>t+estMax(it),0);
+    const cap = CAPS[p];
+    return `<div class="cap ${plan>cap?"over":""}" style="--c:${PAYERS[p].c}">
+      <div class="row1"><span>${p==="lead"?"팀장":PAYERS[p].name.replace(/님$/,"")} 결제 한도</span><span class="amt">${won(paid)} / ${won(cap)}</span></div>
+      <div class="capbar"><i style="width:${Math.min(100,paid/cap*100)}%"></i></div>
+      <div class="hint" style="margin-top:6px">${plan>cap ? "예정 금액 기준 " + won(plan-cap) + " 초과 예상" : "예정 금액 " + won(plan) + " · 여유 " + won(cap-plan)}</div>
+    </div>`;
+  }).join("");
+
+  const when = state.updated ? new Date(state.updated).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+  const statusTxt = !loaded ? "불러오는 중…" :
+    saveState==="saving" ? "저장 중…" : saveState==="err" ? "저장 실패 · 다시 체크해 주세요" : saveState==="loaderr" ? "불러오기 실패" :
+    when ? "업데이트 " + when : "";
+  const statusCls = saveState==="saving" ? "saving" : (saveState==="err"||saveState==="loaderr") ? "err" : "";
+
+  document.getElementById("app").innerHTML = `
+    <div class="top"><h1>워크숍 결제 체크</h1><div class="status ${statusCls}" role="status">${statusTxt}</div></div>
+    <p class="sub">${ITEMS.length}건 중 ${doneCount}건 결제 완료</p>
+    <section class="budget" aria-label="예산 현황">
+      <div class="remain"><span class="k">예상 잔액</span><span class="v">${remTxt}</span></div>
+      <div class="bar" role="img" aria-label="총 가용 금액 대비 항목별 지출">${segs}</div>
+      <div class="scale"><span>결제 완료 ${won(paidTot)}</span><span>총 가용 ${won(BUDGET)}</span></div>
+      <div class="funds"><span>워크숍비 <b>${won(WORKSHOP)}</b></span><span>회식비 <b>${won(DINNER)}</b></span></div>
+    </section>
+    <div class="payers">${payerCards}</div>
+    <div class="filter-note">${filter ? PAYERS[filter].name + " 담당 항목만 보는 중 · 다시 누르면 전체 보기" : "이름을 누르면 담당 항목만 볼 수 있어요"}</div>
+    ${groups}
+    <div class="caps">${capsHtml}</div>
+    <p class="foot">${writable ? "관리자 모드 · 체크하면 바로 저장돼요" : "보기 전용 · 결제 현황은 팀장님이 업데이트해요"}</p>`;
+}
+
+function itemHtml(it){
+  const s = state.items[it.id], p = PAYERS[it.payer];
+  const a = actual(it);
+  const amtTxt = fixed(it) ? won(it.min) : a!=null ? won(a) : it.min===it.max ? "약 " + won(it.min) : `${it.min.toLocaleString("ko-KR")} ~ ${won(it.max)}`;
+  const needAmt = s.paid && !fixed(it) && a==null;
+  const dis = writable ? "" : "disabled";
+  return `<div class="item ${s.paid?"done":""}">
+    <button class="check" role="checkbox" aria-checked="${s.paid}" aria-label="${esc(it.name)} 결제 완료" data-toggle="${it.id}" ${dis}>${CHECK}</button>
+    <div class="row1"><span class="name">${esc(it.name)}</span><span class="amt">${amtTxt}</span></div>
+    <div class="row2"><span class="chip" style="--c:${p.c}">${p.name}</span>
+      <span class="hint ${needAmt?"warn":""}">${needAmt ? "실제 금액을 입력해 주세요" : s.paid ? "결제 완료" : "결제 전"}</span></div>
+    ${fixed(it) ? "" : `<div class="amt-in"><label for="in-${it.id}">실제 금액</label><input id="in-${it.id}" inputmode="numeric" placeholder="${it.max.toLocaleString("ko-KR")}" value="${a!=null?a.toLocaleString("ko-KR"):""}" data-amount="${it.id}" ${dis}></div>`}
+  </div>`;
+}
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-toggle]");
+  if(t && writable){ const s = state.items[t.dataset.toggle]; s.paid = !s.paid; changed(600); return; }
+  const p = e.target.closest("[data-payer]");
+  if(p){ filter = filter===p.dataset.payer ? null : p.dataset.payer; render(); }
+});
+document.addEventListener("input", e => {
+  const el = e.target.closest("[data-amount]"); if(!el) return;
+  const digits = el.value.replace(/[^0-9]/g,"");
+  el.value = digits ? Number(digits).toLocaleString("ko-KR") : "";
+});
+document.addEventListener("change", e => {
+  const el = e.target.closest("[data-amount]"); if(!el || !writable) return;
+  const digits = el.value.replace(/[^0-9]/g,"");
+  state.items[el.dataset.amount].amount = digits ? Number(digits) : null;
+  changed(300);
+});
+
+function changed(delay){
+  state.updated = Date.now();
+  dirty = true;
+  saveState = "saving"; render();
+  clearTimeout(pubTimer);
+  pubTimer = setTimeout(save, delay);
+}
+
+const b64 = str => btoa(unescape(encodeURIComponent(str)));
+const unb64 = str => decodeURIComponent(escape(atob(str.replace(/\n/g,""))));
+const authHeaders = () => ({"Authorization":"Bearer " + token, "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28"});
+
+async function load(){
+  if(dirty) return;
+  try {
+    let data;
+    if(token){
+      const r = await fetch(API + "?t=" + Date.now(), {headers:authHeaders(), cache:"no-store"});
+      if(r.status === 404){ sha = null; data = {}; }
+      else if(!r.ok) throw new Error(r.status);
+      else { const j = await r.json(); sha = j.sha; data = JSON.parse(unb64(j.content)); }
+    } else {
+      let r = await fetch(API + "?t=" + Date.now(), {headers:{"Accept":"application/vnd.github.raw+json"}, cache:"no-store"}).catch(()=>null);
+      if(!r || !r.ok) r = await fetch("data.json?t=" + Date.now(), {cache:"no-store"});
+      if(!r.ok) throw new Error(r.status);
+      data = await r.json();
+    }
+    if(dirty) return;
+    state = normalize(data);
+    loaded = true; if(saveState==="loaderr") saveState = "";
+  } catch(e){
+    loaded = true; saveState = "loaderr";
+  }
+  const f = document.activeElement;
+  if(!(f && f.matches && f.matches("[data-amount]"))) render();
+}
+
+async function save(retry){
+  try {
+    if(sha === null && !retry){
+      const r = await fetch(API + "?t=" + Date.now(), {headers:authHeaders(), cache:"no-store"});
+      if(r.ok) sha = (await r.json()).sha;
+    }
+    const body = {message:"워크숍 결제 체크 업데이트", content:b64(JSON.stringify(state, null, 2) + "\n")};
+    if(sha) body.sha = sha;
+    const r = await fetch(API, {method:"PUT", headers:authHeaders(), body:JSON.stringify(body)});
+    if((r.status === 409 || r.status === 422) && !retry){
+      const g = await fetch(API + "?t=" + Date.now(), {headers:authHeaders(), cache:"no-store"});
+      if(g.ok) sha = (await g.json()).sha;
+      return save(true);
+    }
+    if(r.status === 401 || r.status === 403){ saveState = "err"; render(); renderAdmin("토큰 권한을 확인해 주세요. Contents 쓰기 권한이 필요해요."); return; }
+    if(!r.ok) throw new Error(r.status);
+    sha = (await r.json()).content.sha;
+    dirty = false; saveState = "";
+  } catch(e){
+    saveState = "err";
+  }
+  render();
+}
+
+function renderAdmin(msg){
+  const el = document.getElementById("admin");
+  if(token){
+    el.innerHTML = `<p class="foot">${msg ? `<span class="admin-err">${esc(msg)}</span><br>` : ""}<button type="button" class="linkbtn" data-logout>관리자 모드 끄기</button></p>`;
+  } else {
+    el.innerHTML = `<details class="admin-box"><summary>관리자 로그인</summary>
+      <p class="hint">GitHub 토큰을 입력하면 이 기기에서 체크할 수 있어요. 토큰은 이 브라우저에만 저장돼요.</p>
+      <div class="amt-in" style="grid-column:auto"><input id="tok" type="password" autocomplete="off" placeholder="github_pat_…" style="max-width:none;text-align:left"><button type="button" class="btn" data-login>저장</button></div>
+      ${msg ? `<p class="hint warn">${esc(msg)}</p>` : ""}</details>`;
+  }
+}
+
+document.addEventListener("click", async e => {
+  if(e.target.closest("[data-login]")){
+    const v = document.getElementById("tok").value.trim(); if(!v) return;
+    const r = await fetch(`https://api.github.com/repos/${REPO}`, {headers:{"Authorization":"Bearer " + v}}).catch(()=>null);
+    const j = r && r.ok ? await r.json() : null;
+    if(!j || !(j.permissions && j.permissions.push)){ renderAdmin("이 토큰으로는 저장소에 쓸 수 없어요."); return; }
+    token = v; try { localStorage.setItem(TOKEN_KEY, v); } catch(_){}
+    writable = true; renderAdmin(); await load(); render();
+  }
+  if(e.target.closest("[data-logout]")){
+    token = null; try { localStorage.removeItem(TOKEN_KEY); } catch(_){}
+    writable = false; renderAdmin(); render();
+  }
+});
+document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") load(); });
+setInterval(() => { if(!token && document.visibilityState === "visible") load(); }, 120000);
+
+render();
+renderAdmin();
+load();
+})();
+</script>
+</body>
+</html>
