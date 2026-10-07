@@ -5,15 +5,15 @@
       "amount": null
     },
     "aqua": {
-      "paid": false,
+      "paid": true,
       "amount": null
     },
     "buffet": {
-      "paid": false,
+      "paid": true,
       "amount": null
     },
     "snack": {
-      "paid": false,
+      "paid": true,
       "amount": null
     },
     "movie": {
@@ -33,5 +33,5 @@
       "amount": null
     }
   },
-  "updated": 1791366400512
+  "updated": 1791366402759
 }
