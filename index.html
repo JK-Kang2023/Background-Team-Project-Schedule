@@ -144,7 +144,7 @@ comps.forEach(c=>{const o=document.createElement('option');o.value=o.textContent
 asss.forEach(a=>{const o=document.createElement('option');o.value=o.textContent=a;fAss.appendChild(o);});
 let scale='month';
 const CW_D=20,CW_W=28,CW_M=60,CW_Q=200;
-const RS=new Date('2025-07-01'),RE=new Date('2027-07-01'),RMS=RE-RS;
+const RS=new Date('2025-07-01'),RE=new Date('2028-07-01'),RMS=RE-RS;
 function genDays(){const d=[];let c=new Date(RS);while(c<RE){d.push(new Date(c));c.setDate(c.getDate()+1);}return d;}
 function genWeeks(){const w=[];let d=new Date(RS);const dw=d.getDay();d.setDate(d.getDate()-(dw===0?6:dw-1));while(d<RE){w.push(new Date(d));d.setDate(d.getDate()+7);}return w;}
 function genMonths(){const m=[];let d=new Date(RS);while(d<RE){m.push(new Date(d));d.setMonth(d.getMonth()+1);}return m;}
