@@ -17,7 +17,7 @@
       "amount": null
     },
     "movie": {
-      "paid": false,
+      "paid": true,
       "amount": 74000
     },
     "escape": {
@@ -33,5 +33,5 @@
       "amount": null
     }
   },
-  "updated": 1791858990395
+  "updated": 1791858992765
 }
