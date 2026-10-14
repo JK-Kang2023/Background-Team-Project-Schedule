@@ -73,13 +73,14 @@ h2 span{font-size:12px;color:var(--muted);font-weight:500}
 .item.done .name{color:var(--muted)}
 .amt{font-weight:600;white-space:nowrap}
 .row2{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
 .chip{font-size:12px;font-weight:600;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);padding:2px 8px;border-radius:999px}
 .hint{font-size:12px;color:var(--muted)}
 .hint.warn{color:var(--p3)}
 .amt-in{display:flex;align-items:center;gap:6px;grid-column:2;margin-top:6px}
 .amt-in input{font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%;max-width:170px;text-align:right}
 .amt-in input:disabled{opacity:.6}
-.amt-in label{font-size:12px;color:var(--muted);white-space:nowrap}
+.amt-in label{font-size:12px;color:var(--muted);white-space:nowrap;min-width:5.5em}
 
 .caps{display:flex;flex-direction:column;gap:8px;margin-top:22px}
 .cap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
@@ -118,12 +119,12 @@ const GROUPS = [
 ];
 const ITEMS = [
   {id:"hotel", g:"g1", name:"호텔 숙박비", payer:"lead", min:2184050, max:2184050},
-  {id:"aqua", g:"g1", name:"아쿠아리움·서울스카이 추가비", payer:"lead", min:44000, max:44000},
+  {id:"aqua", g:"g1", name:"아쿠아리움·서울스카이 추가비", payer:"lead", min:48000, max:48000},
   {id:"buffet", g:"g1", name:"저녁 뷔페", payer:"lead", min:1716000, max:1716000},
-  {id:"snack", g:"g1", name:"한정선 간식", payer:"lead", min:341000, max:341000},
+  {id:"snack", g:"g1", name:"한정선 간식", payer:"lead", min:374000, max:374000},
   {id:"movie", g:"g2", name:"영화비", payer:"p1", min:100000, max:130000},
   {id:"escape", g:"g2", name:"방탈출", payer:"p3", min:100000, max:130000},
-  {id:"breakfast", g:"g2", name:"아침 조식", payer:"lead", min:180000, max:200000},
+  {id:"breakfast", g:"g2", name:"아침 조식", payer:"lead", split:["lead","p2"], min:180000, max:200000},
   {id:"etc", g:"g2", name:"기타 비용 (간식·음료 등)", payer:"p2", min:200000, max:200000, approx:true}
 ];
 
@@ -149,6 +150,19 @@ const actual = it => fixed(it) ? it.min : state.items[it.id].amount;
 const estMin = it => actual(it) ?? it.min;
 const estMax = it => actual(it) ?? it.max;
 const paidAmt = it => state.items[it.id].paid ? estMax(it) : 0;
+const payersOf = it => it.split || [it.payer];
+const involves = (it,p) => payersOf(it).includes(p);
+// amount attributed to payer p (which: "min" | "max")
+function share(it, p, which){
+  const total = which === "min" ? estMin(it) : estMax(it);
+  if(!it.split) return p === it.payer ? total : 0;
+  const part = state.items[it.id].part;
+  const sec = part != null ? Math.min(part, total) : total / 2;
+  if(p === it.split[1]) return sec;
+  if(p === it.split[0]) return total - sec;
+  return 0;
+}
+const paidShare = (it,p) => state.items[it.id].paid ? share(it,p,"max") : 0;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -162,13 +176,13 @@ function render(){
   const doneCount = ITEMS.filter(it=>state.items[it.id].paid).length;
 
   const order = ["lead","p1","p2","p3"];
-  const segs = order.flatMap(p => ITEMS.filter(it=>it.payer===p)).map(it =>
-    `<div class="seg ${state.items[it.id].paid?"":"todo"}" style="width:${estMax(it)/BUDGET*100}%;background-color:${PAYERS[it.payer].c}" title="${esc(it.name)}"></div>`).join("");
+  const segs = order.flatMap(p => ITEMS.filter(it=>involves(it,p)).map(it => ({it,p}))).map(({it,p}) =>
+    `<div class="seg ${state.items[it.id].paid?"":"todo"}" style="width:${share(it,p,"max")/BUDGET*100}%;background-color:${PAYERS[p].c}" title="${esc(it.name)}"></div>`).join("");
 
   const payerCards = order.map(p => {
-    const its = ITEMS.filter(it=>it.payer===p);
+    const its = ITEMS.filter(it=>involves(it,p));
     const done = its.filter(it=>state.items[it.id].paid).length;
-    const amt = its.reduce((s,it)=>s+paidAmt(it),0);
+    const amt = its.reduce((s,it)=>s+paidShare(it,p),0);
     return `<button class="payer" style="--c:${PAYERS[p].c}" data-payer="${p}" aria-pressed="${filter===p}">
       <div class="n">${PAYERS[p].name}</div>
       <div class="a">${won(amt)}</div>
@@ -176,7 +190,7 @@ function render(){
   }).join("");
 
   const groups = GROUPS.map(g => {
-    const its = ITEMS.filter(it=>it.g===g.id && (!filter || it.payer===filter));
+    const its = ITEMS.filter(it=>it.g===g.id && (!filter || involves(it,filter)));
     if(!its.length) return "";
     const all = ITEMS.filter(it=>it.g===g.id);
     const gMin = all.reduce((s,it)=>s+estMin(it),0), gMax = all.reduce((s,it)=>s+estMax(it),0);
@@ -185,9 +199,9 @@ function render(){
   }).join("");
 
   const capsHtml = order.map(p => {
-    const its = ITEMS.filter(it=>it.payer===p);
-    const paid = its.reduce((t,it)=>t+paidAmt(it),0);
-    const plan = its.reduce((t,it)=>t+estMax(it),0);
+    const its = ITEMS.filter(it=>involves(it,p));
+    const paid = its.reduce((t,it)=>t+paidShare(it,p),0);
+    const plan = its.reduce((t,it)=>t+share(it,p,"max"),0);
     const cap = CAPS[p];
     return `<div class="cap ${plan>cap?"over":""}" style="--c:${PAYERS[p].c}">
       <div class="row1"><span>${p==="lead"?"팀장":PAYERS[p].name.replace(/님$/,"")} 결제 한도</span><span class="amt">${won(paid)} / ${won(cap)}</span></div>
@@ -227,9 +241,11 @@ function itemHtml(it){
   return `<div class="item ${s.paid?"done":""}">
     <button class="check" role="checkbox" aria-checked="${s.paid}" aria-label="${esc(it.name)} 결제 완료" data-toggle="${it.id}" ${dis}>${CHECK}</button>
     <div class="row1"><span class="name">${esc(it.name)}</span><span class="amt">${amtTxt}</span></div>
-    <div class="row2"><span class="chip" style="--c:${p.c}">${p.name}</span>
+    <div class="row2"><span class="chips">${payersOf(it).map(k => `<span class="chip" style="--c:${PAYERS[k].c}">${PAYERS[k].name}</span>`).join("")}</span>
       <span class="hint ${needAmt?"warn":""}">${needAmt ? "실제 금액을 입력해 주세요" : s.paid ? "결제 완료" : "결제 전"}</span></div>
     ${fixed(it) ? "" : `<div class="amt-in"><label for="in-${it.id}">실제 금액</label><input id="in-${it.id}" inputmode="numeric" placeholder="${it.max.toLocaleString("ko-KR")}" value="${a!=null?a.toLocaleString("ko-KR"):""}" data-amount="${it.id}" ${dis}></div>`}
+    ${it.split ? `<div class="amt-in"><label for="part-${it.id}">그중 ${PAYERS[it.split[1]].name}</label><input id="part-${it.id}" inputmode="numeric" placeholder="반반" value="${s.part!=null?s.part.toLocaleString("ko-KR"):""}" data-amount="${it.id}" data-field="part" ${dis}></div>
+    <div class="hint" style="grid-column:2">${PAYERS[it.split[0]].name} ${won(share(it,it.split[0],"max"))} · ${PAYERS[it.split[1]].name} ${won(share(it,it.split[1],"max"))}${s.part==null?" (반반 기준)":""}</div>` : ""}
   </div>`;
 }
 
@@ -247,7 +263,7 @@ document.addEventListener("input", e => {
 document.addEventListener("change", e => {
   const el = e.target.closest("[data-amount]"); if(!el || !writable) return;
   const digits = el.value.replace(/[^0-9]/g,"");
-  state.items[el.dataset.amount].amount = digits ? Number(digits) : null;
+  state.items[el.dataset.amount][el.dataset.field || "amount"] = digits ? Number(digits) : null;
   changed(300);
 });
 
