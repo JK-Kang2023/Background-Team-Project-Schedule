@@ -22,7 +22,7 @@
     },
     "escape": {
       "paid": true,
-      "amount": 140000
+      "amount": 187600
     },
     "breakfast": {
       "paid": false,
@@ -33,5 +33,5 @@
       "amount": 255100
     }
   },
-  "updated": 1792071514709
+  "updated": 1792072361470
 }
