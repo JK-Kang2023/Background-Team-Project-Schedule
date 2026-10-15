@@ -13,7 +13,7 @@
       "amount": null
     },
     "snack": {
-      "paid": false,
+      "paid": true,
       "amount": null
     },
     "movie": {
@@ -33,5 +33,5 @@
       "amount": 156000
     }
   },
-  "updated": 1792039120899
+  "updated": 1792041571610
 }
