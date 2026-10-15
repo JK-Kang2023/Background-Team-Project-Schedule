@@ -9,7 +9,7 @@
       "amount": null
     },
     "buffet": {
-      "paid": false,
+      "paid": true,
       "amount": null
     },
     "snack": {
@@ -33,5 +33,5 @@
       "amount": 226100
     }
   },
-  "updated": 1792051485639
+  "updated": 1792059746690
 }
