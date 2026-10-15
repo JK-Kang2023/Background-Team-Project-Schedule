@@ -29,9 +29,9 @@
       "amount": 220000
     },
     "etc": {
-      "paid": false,
+      "paid": true,
       "amount": 150800
     }
   },
-  "updated": 1792038643704
+  "updated": 1792038653736
 }
