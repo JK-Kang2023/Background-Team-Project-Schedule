@@ -25,7 +25,7 @@
       "amount": 187600
     },
     "breakfast": {
-      "paid": false,
+      "paid": true,
       "amount": 250000
     },
     "etc": {
@@ -33,5 +33,5 @@
       "amount": 255100
     }
   },
-  "updated": 1792119303441
+  "updated": 1792119305095
 }
