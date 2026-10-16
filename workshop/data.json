@@ -26,12 +26,13 @@
     },
     "breakfast": {
       "paid": true,
-      "amount": 250000
+      "amount": 250000,
+      "part": 100000
     },
     "etc": {
       "paid": true,
       "amount": 255100
     }
   },
-  "updated": 1792119305095
+  "updated": 1792119319394
 }
